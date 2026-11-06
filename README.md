@@ -2,7 +2,7 @@
 
 **Validate the reward, optimize it, and find where it breaks.** This is a controlled study of reward-guided fine-tuning for English→German machine translation, extended to cascaded speech translation.
 
-> **Status: 🚧 proposal stage.** The design is complete: see the [project proposal](docs/proposal.md) and the [system workflow](docs/workflow.md). Implementation starts with Phase 1, and the benchmark tables below fill in as experiments finish.
+> **Status: 🚧 Phase 1 code ready, first run pending.** The reward benchmark runs on a free Kaggle or Colab T4 via [`notebooks/p1_reward_benchmark.ipynb`](notebooks/p1_reward_benchmark.ipynb). Phases 2–4 are designed in the [project proposal](docs/proposal.md) and the [system workflow](docs/workflow.md). The benchmark tables below fill in as experiments finish.
 
 ---
 
@@ -100,37 +100,45 @@ Best-of-N picks the top candidate for a sentence. DPO learns from a better/worse
 
 A worked example that follows one sentence through the whole system is in [workflow §8](docs/workflow.md#8-end-to-end-walkthrough-one-sentence-through-the-system).
 
-## Repository layout (planned)
+## Repository layout
 
 ```
 machine-translation-with-RLHF/
-├── configs/            # one YAML per experiment: sft, rsft, dpo, grpo, grpo_guarded, …
 ├── docs/               # proposal.md, workflow.md
-├── scripts/            # thin CLIs, one per pipeline step: p1_*, p2_*, p3_*, p4_*
+├── notebooks/          # p1_reward_benchmark.ipynb: runs Phase 1 on a Kaggle/Colab T4
+├── scripts/            # one CLI per pipeline step: p1_build_inputs, p1_score, p1_analyze
 ├── src/mtrlhf/
 │   ├── rewards/        # one interface: score(src, hyp, ref=None) → higher is better
-│   ├── meta_eval/      # mt-metrics-eval loader, agreement statistics, blind-spot probes
-│   ├── data/           # parallel data, prompt pool, test-set loaders, prompt template
-│   ├── decode/         # vLLM sampling, best-of-N (MBR as a stretch goal)
-│   ├── train/          # SFT, RSFT, DPO, GRPO wrappers around TRL
-│   ├── eval/           # metrics, hacking diagnostics, bootstrap tests
-│   └── speech/         # Whisper ASR, WER, cascade, latency
-├── human_eval/         # annotation guidelines and blinded sheets
-├── reports/            # tables and figures per phase
-└── tests/
+│   │                   #   CometKiwi / COMET-22 (comet.py), MetricX-24 (metricx.py), chrF / BLEU
+│   └── meta_eval/      # mt-metrics-eval loader, agreement statistics, blind-spot probes, report
+├── tests/              # unit tests + an end-to-end run on a small fake WMT dataset
+└── results/            # finished results, one folder per phase
 ```
 
-## Quickstart (target interface)
+Planned for later phases: `configs/`, `src/mtrlhf/{data,decode,train,eval,speech}/` and `human_eval/` (see [workflow](docs/workflow.md)).
 
-```bash
-pip install -e ".[dev]"
-```
+## Running Phase 1
+
+**On Kaggle or Colab (recommended).** Open [`notebooks/p1_reward_benchmark.ipynb`](notebooks/p1_reward_benchmark.ipynb), choose a T4 GPU, add a Hugging Face token as the `HF_TOKEN` secret (after accepting the [CometKiwi license](https://huggingface.co/Unbabel/wmt22-cometkiwi-da)), and run all cells. It takes about 1–2 hours and produces `p1_results.zip`.
+
+**Anywhere else:**
 
 ```bash
-# Phase 1: reward benchmark and blind spots
-python scripts/p1_meta_eval.py --testsets wmt22 wmt23 --lp en-de --rewards cometkiwi22 metricx24_qe comet22 chrf
-python scripts/p1_probes.py --rewards cometkiwi22 metricx24_qe
+pip install -e ".[phase1,dev]"
+pip install --no-deps unbabel-comet==2.2.7 "git+https://github.com/google-research/mt-metrics-eval"
 ```
+
+```bash
+python scripts/p1_build_inputs.py --run runs/p1 --download     # WMT22 + WMT23 en-de with MQM, probes (CPU)
+python scripts/p1_score.py --run runs/p1 --rewards chrf bleu cometkiwi22 comet22 metricx24_qe metricx24_ref   # GPU
+python scripts/p1_analyze.py --run runs/p1                     # report in runs/p1/report/summary.md (CPU)
+```
+
+```bash
+pytest   # unit tests and an end-to-end run on a small fake dataset (no GPU, no downloads)
+```
+
+## Later phases (target interface)
 
 ```bash
 # Phase 2: SFT, then alignment from the same checkpoint
@@ -154,7 +162,8 @@ python scripts/p4_cascade_eval.py --systems all
 
 ## Roadmap
 
-- [ ] **M1** Reward interface, mt-metrics-eval loader, reward benchmark (A), blind-spot probes → choose R_train / R_eval
+- [x] **M1a** Phase 1 code: reward interface (CometKiwi, COMET-22, MetricX-24, chrF, BLEU), mt-metrics-eval loader, agreement statistics, blind-spot probes, Kaggle/Colab notebook, tests
+- [ ] **M1b** Phase 1 run on a T4 → reward benchmark (A) and blind-spot profile → choose R_train / R_eval
 - [ ] **M2** Data pipeline, SFT, evaluation harness, anchors, best-of-N curve
 - [ ] **M3** Sampling and scoring, RSFT, DPO ← *minimum viable project*
 - [ ] **M4** GRPO, KL sweep, guarded GRPO, over-optimization curves → benchmark B

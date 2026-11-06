@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+build/
+dist/
+.venv/
+venv/
+
+# Experiment outputs (results worth keeping are copied to results/)
+runs/
+data/
+ckpt/
+wandb/

@@ -123,7 +123,7 @@ Implementations:
 
 ### 4.1 Meta-evaluation against expert judgements
 
-**Input.** For WMT22 and WMT23 en→de, `mt-metrics-eval` provides the source segments, the references, every submitted system's outputs, and the expert **MQM** score for each (system, segment). MQM scores are error-weighted: annotators mark error spans with a category and a severity.
+**Input.** For WMT22 and WMT23 en→de, `mt-metrics-eval` provides the source segments, the references, every submitted system's outputs, and the expert **MQM** score for each (system, segment). MQM scores are error-weighted: annotators mark error spans with a category and a severity. WMT23 en→de was annotated at paragraph level, so the project uses mt-metrics-eval's sentence-split version (`wmt23.sent`) to match its sentence-level setup. Outlier systems and human translations are excluded, so only MT outputs are compared.
 
 **Process.**
 1. Score every (source, system output) with each candidate reward. This is inference only and runs on a free T4.
@@ -132,7 +132,9 @@ Implementations:
    - **segment-level Kendall τ** and **tie-calibrated pairwise accuracy** (*acc_eq*), the standard WMT meta-evaluation statistics;
    - **system-level pairwise accuracy**: does the reward rank whole systems correctly?
 3. Bootstrap the confidence intervals, and run permutation tests for "reward X is better than reward Y".
-4. **Sanity check:** reproduce one officially reported WMT23 correlation for a metric whose scores ship with mt-metrics-eval, using the library's own routines, before trusting the custom statistics.
+4. **Sanity checks**, before trusting the numbers:
+   - our CometKiwi, COMET-22 and chrF scores must reproduce the scores that ship with the WMT23 data for the same public models (Pearson ≈ 1);
+   - our tie-calibrated accuracy is recomputed with mt-metrics-eval's own implementation and must match exactly.
 
 **Output.** Benchmark A: rewards × statistics, with CIs, plus throughput (segments per second) and memory for each reward on a 24 GB GPU.
 
@@ -355,8 +357,9 @@ Evaluate S0 and every aligned system on FLORES devtest **de→en** (the reverse 
 
 | Step | Command | Produces |
 |---|---|---|
-| 1a | `python scripts/p1_meta_eval.py --testsets wmt22 wmt23 --lp en-de --rewards cometkiwi22 metricx24_qe comet22 chrf` | `reports/p1/reward_benchmark.csv` |
-| 1b | `python scripts/p1_probes.py --rewards cometkiwi22 metricx24_qe` | `reports/p1/blind_spots.csv`, heatmap |
+| 1a | `python scripts/p1_build_inputs.py --run runs/p1 --download` | `segments.jsonl` (rated translations), `probes.jsonl` |
+| 1b | `python scripts/p1_score.py --run runs/p1 --rewards chrf bleu cometkiwi22 comet22 metricx24_qe metricx24_ref` | `scores/<reward>.jsonl` and timing |
+| 1c | `python scripts/p1_analyze.py --run runs/p1` | `report/summary.md`, `reward_benchmark.csv`, `blind_spots.csv/.png` |
 | 2a | `python scripts/p2_prepare_data.py` | `data/sft.jsonl`, `data/prompts.jsonl` |
 | 2b | `python scripts/p2_train.py --config configs/sft.yaml` | `ckpt/sft` (S0) |
 | 2c | `python scripts/p2_sample_and_score.py --policy ckpt/sft --n 8 --reward R_train` | `data/candidates.scored.jsonl` |

@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mtrlhf"
+version = "0.1.0"
+description = "Reward validation, preference optimization and reward-hacking analysis for English-German machine translation."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Xusheng Guo" }]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "sacrebleu>=2.0",
+]
+
+[project.optional-dependencies]
+# Phase 1 (reward benchmark). Two packages are installed separately with --no-deps
+# (see notebooks/p1_reward_benchmark.ipynb), because their declared dependencies
+# would downgrade the preinstalled Kaggle/Colab stack:
+#   pip install --no-deps unbabel-comet==2.2.7   # pins numpy<2, transformers<5
+#   pip install --no-deps git+https://github.com/google-research/mt-metrics-eval   # pulls apache_beam
+# Their runtime needs for inference/loading are covered by the list below.
+phase1 = [
+    "torch",
+    # COMET 2.2.7 unpacks the XLM-R output tuple, whose layout changed in transformers 5.
+    "transformers>=4.40,<5",
+    "sentencepiece",
+    "protobuf",
+    "huggingface-hub",
+    "pytorch-lightning>=2.0",
+    "torchmetrics",
+    "entmax",
+    "pandas",
+    "absl-py",
+    "dacite",
+]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
