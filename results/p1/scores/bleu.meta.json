@@ -1,0 +1,16 @@
+{
+  "reward": "bleu",
+  "kind": "bleu",
+  "needs_reference": true,
+  "family": "surface",
+  "name": "bleu",
+  "device": "cuda",
+  "gpu": "Tesla T4",
+  "n_gpus": 2,
+  "n_rows": 42599,
+  "n_unique": 32159,
+  "load_seconds": 0.1,
+  "score_seconds": 4.8,
+  "inputs_per_second": 6744.39,
+  "peak_gpu_mem_gb": 0.0
+}
