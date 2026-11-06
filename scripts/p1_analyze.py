@@ -59,6 +59,9 @@ def main() -> None:
     ap.add_argument("--bootstrap", type=int, default=1000)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--no-crosscheck", action="store_true", help="skip the mt-metrics-eval acc_eq cross-check")
+    ap.add_argument("--pool-testsets", nargs="+", default=["wmt22", "wmt23.sent"],
+                    help="sentence-level test sets pooled for the headline number and the reward choice; "
+                         "others (e.g. paragraph-level wmt24) are reported per test set only")
     args = ap.parse_args()
 
     out_dir = os.path.join(args.run, "report" if args.scores == "scores" else f"report_{args.scores}")
@@ -75,9 +78,11 @@ def main() -> None:
     scored_segments = [r for r in segments if any(r["key"] in scores[n] for n in names)]
     testsets = sorted({r["testset"] for r in scored_segments})
     std_refs = {ts: m["std_ref"] for ts, m in inputs_meta["testsets"].items()}
+    pool = [ts for ts in testsets if ts in args.pool_testsets] or testsets
+    separate = [ts for ts in testsets if ts not in pool]
 
     values = {n: (lambda r, sc=scores[n]: sc.get(r["key"])) for n in names}
-    results, samples = analysis.benchmark(scored_segments, values, args.bootstrap, args.seed)
+    results, samples = analysis.benchmark(scored_segments, values, args.bootstrap, args.seed, pool=pool)
     comparisons = analysis.paired_comparisons(samples, names)
 
     shipped_names = sorted({k for r in scored_segments for k in r.get("shipped", {})})
@@ -118,7 +123,13 @@ def main() -> None:
            "*Within-source accuracy*: of all pairs of translations of the **same source** where the "
            "experts preferred one, the share the reward ranks the same way (50% = chance). "
            "This is how best-of-N, DPO and GRPO use a reward. 95% bootstrap CIs over source segments.", ""]
-    hdr = ["Reward", "Needs ref", "Within-source acc. (pooled)"] + [f"Within-source {ts}" for ts in testsets] + \
+    if separate:
+        md += [f"The headline number and the reward choice use {' + '.join(pool)}. "
+               f"{', '.join(separate)} is reported in its own column as a check on newer, LLM-era systems "
+               "(paragraph-level segments, so very long inputs are truncated by CometKiwi), and does not "
+               "influence the choice.", ""]
+    hdr = ["Reward", "Needs ref", f"Within-source acc. ({' + '.join(pool)})"] + \
+          [f"Within-source {ts}" for ts in testsets] + \
           [f"acc_eq ({' / '.join(testsets)})", f"Kendall τ_b ({' / '.join(testsets)})",
            f"System acc. ({' / '.join(testsets)})", "Speed (inputs/s)"]
     rows = []

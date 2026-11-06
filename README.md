@@ -38,7 +38,7 @@ Best-of-N picks the top candidate for a sentence. DPO learns from a better/worse
 | Language pair | **English → German.** One high-resource pair, so that the effect of the training method can be isolated |
 | Policy | Qwen2.5-1.5B-Instruct + LoRA (0.5B for debugging) |
 | Reward candidates | CometKiwi-22 (QE) and MetricX-24 in QE mode. COMET-22, MetricX-24 with references and chrF serve as reference-based comparisons |
-| Human judgements | WMT22–23 en→de MQM via [`mt-metrics-eval`](https://github.com/google-research/mt-metrics-eval) |
+| Human judgements | WMT22–24 en→de MQM via [`mt-metrics-eval`](https://github.com/google-research/mt-metrics-eval). WMT22 + WMT23 decide the reward choice; WMT24 (newest, LLM-era systems) is a separate check |
 | Alignment methods | Best-of-N reranking · rejection-sampling FT (RSFT) · DPO · GRPO · GRPO + guards |
 | Anchors | OPUS-MT en-de (classic NMT) · Qwen2.5-1.5B zero-shot · Qwen2.5-7B zero-shot |
 | Text test sets | FLORES-200 devtest (primary), WMT24 en→de (secondary); de→en and en→zh as a forgetting check |
@@ -56,15 +56,15 @@ Best-of-N picks the top candidate for a sentence. DPO learns from a better/worse
 
 *Results are filled in as experiments complete.*
 
-**A · Reward models vs. expert judgements** (WMT22–23 en→de, MQM)
+**A · Reward models vs. expert judgements** (en→de MQM: WMT22 + WMT23 pooled, WMT24 separately)
 
-| Reward | Needs reference | Within-source acc. ↑ | Segment Kendall τ ↑ | System pairwise acc. ↑ | Probe detection ↑ | Throughput |
-|---|---|---|---|---|---|---|
-| CometKiwi-22 | no | – | – | – | – | – |
-| MetricX-24 (QE) | no | – | – | – | – | – |
-| COMET-22 | yes | – | – | – | – | – |
-| MetricX-24 (ref) | yes | – | – | – | – | – |
-| chrF | yes | – | – | – | – | – |
+| Reward | Needs reference | Within-source acc. ↑ | Within-source acc. on WMT24 ↑ | Segment Kendall τ ↑ | System pairwise acc. ↑ | Probe detection ↑ | Throughput |
+|---|---|---|---|---|---|---|---|
+| CometKiwi-22 | no | – | – | – | – | – | – |
+| MetricX-24 (QE) | no | – | – | – | – | – | – |
+| COMET-22 | yes | – | – | – | – | – | – |
+| MetricX-24 (ref) | yes | – | – | – | – | – | – |
+| chrF | yes | – | – | – | – | – | – |
 
 **B · Alignment methods** (FLORES-200 devtest, en→de)
 
@@ -119,7 +119,7 @@ Planned for later phases: `configs/`, `src/mtrlhf/{data,decode,train,eval,speech
 
 ## Running Phase 1
 
-**On Kaggle or Colab (recommended).** Open [`notebooks/p1_reward_benchmark.ipynb`](notebooks/p1_reward_benchmark.ipynb), choose a T4 GPU, add a Hugging Face token as the `HF_TOKEN` secret (after accepting the [CometKiwi license](https://huggingface.co/Unbabel/wmt22-cometkiwi-da)), and run all cells. It takes about 1.5–2 hours. With an optional `GH_TOKEN` secret (a fine-grained GitHub token for this repository with *Contents: Read and write*), the notebook pushes the scores to `results/p1/` after each reward. Results then survive a stopped session, and a re-run continues where the last one stopped.
+**On Kaggle or Colab (recommended).** Open [`notebooks/p1_reward_benchmark.ipynb`](notebooks/p1_reward_benchmark.ipynb), choose a T4 GPU, add a Hugging Face token as the `HF_TOKEN` secret (after accepting the [CometKiwi license](https://huggingface.co/Unbabel/wmt22-cometkiwi-da)), and run all cells. It takes about 2–3 hours. With an optional `GH_TOKEN` secret (a fine-grained GitHub token for this repository with *Contents: Read and write*), the notebook pushes the scores to `results/p1/` after each reward. Results then survive a stopped session, and a re-run continues where the last one stopped.
 
 **Anywhere else:**
 
@@ -129,7 +129,7 @@ pip install --no-deps unbabel-comet==2.2.7 "git+https://github.com/google-resear
 ```
 
 ```bash
-python scripts/p1_build_inputs.py --run runs/p1 --download     # WMT22 + WMT23 en-de with MQM, probes (CPU)
+python scripts/p1_build_inputs.py --run runs/p1 --download     # WMT22–24 en-de with MQM, probes (CPU)
 python scripts/p1_score.py --run runs/p1 --rewards chrf bleu cometkiwi22 comet22 metricx24_qe metricx24_ref   # GPU
 python scripts/p1_analyze.py --run runs/p1                     # report in runs/p1/report/summary.md (CPU)
 ```

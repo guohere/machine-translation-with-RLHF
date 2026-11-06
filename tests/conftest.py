@@ -69,20 +69,36 @@ def _write(path: str, lines) -> None:
         fh.write("\n".join(lines) + "\n")
 
 
-def build_fake_mtme(root: str) -> str:
-    d = os.path.join(root, "wmt22")
+# Per test set: standard reference, the other reference (also MQM-scored as a human
+# "system"), the outlier system named in mt-metrics-eval's meta info, and the
+# stored CometKiwi metric name. WMT24 en-de uses refB as its standard reference.
+LAYOUT = {
+    "wmt22": dict(std="refA", alt="refB", outlier="M2M100_1.2B-B4", kiwi="COMETKiwi-src"),
+    "wmt24": dict(std="refB", alt="refA", outlier="MSLC", kiwi="CometKiwi-src"),
+}
+
+
+def _build_testset(root: str, testset: str, std: str, alt: str, outlier: str, kiwi: str) -> None:
+    from sacrebleu.metrics import CHRF
+
+    d = os.path.join(root, testset)
     lp = "en-de"
-    docs = ["news doc1"] * 4 + ["social doc2"] * 4
-    _write(f"{d}/documents/{lp}.docs", docs)
+    texts = {"refA": REF_A, "refB": REF_B}
+    std_text = texts[std]
+    systems = {"sysA": std_text, "sysB": [_degrade(t, 3) for t in std_text],
+               "sysC": [_degrade(t, 7) for t in std_text], outlier: SRC, alt: texts[alt]}
+    mqm = {"sysA": MQM["sysA"], "sysB": MQM["sysB"], "sysC": MQM["sysC"],
+           outlier: MQM["M2M100_1.2B-B4"], alt: MQM["refB"]}
+    _write(f"{d}/documents/{lp}.docs", ["news doc1"] * 4 + ["social doc2"] * 4)
     _write(f"{d}/sources/{lp}.txt", SRC)
-    _write(f"{d}/references/{lp}.refA.txt", REF_A)
-    _write(f"{d}/references/{lp}.refB.txt", REF_B)
-    for name, lines in SYSTEMS.items():
+    for name, text in texts.items():
+        _write(f"{d}/references/{lp}.{name}.txt", text)
+    for name, lines in systems.items():
         _write(f"{d}/system-outputs/{lp}/{name}.txt", lines)
-    seg = [f"{s} {'None' if v is None else v}" for s, vals in MQM.items() for v in vals]
-    _write(f"{d}/human-scores/{lp}.mqm.seg.score", seg)
+    _write(f"{d}/human-scores/{lp}.mqm.seg.score",
+           [f"{s} {'None' if v is None else v}" for s, vals in mqm.items() for v in vals])
     sysl, doml = [], []
-    for s, vals in MQM.items():
+    for s, vals in mqm.items():
         ok = [v for v in vals if v is not None]
         sysl.append(f"{s} {sum(ok) / len(ok)}")
         for dom, part in (("news", vals[:4]), ("social", vals[4:])):
@@ -90,15 +106,18 @@ def build_fake_mtme(root: str) -> str:
             doml.append(f"{dom} {s} {sum(ok) / len(ok)}")
     _write(f"{d}/human-scores/{lp}.mqm.sys.score", sysl)
     _write(f"{d}/human-scores/{lp}.mqm.domain.score", doml)
-    # Stored metric scores: a fake "COMETKiwi" that tracks MQM, and chrF vs refA.
-    kiwi = [f"{s} {0.8 + (0.0 if v is None else v) / 50}" for s, vals in MQM.items() for v in vals]
-    _write(f"{d}/metric-scores/{lp}/COMETKiwi-src.seg.score", kiwi)
-    from sacrebleu.metrics import CHRF
-
+    # Stored metric scores: a fake CometKiwi that tracks MQM, and chrF vs the standard reference.
+    _write(f"{d}/metric-scores/{lp}/{kiwi}.seg.score",
+           [f"{s} {0.8 + (0.0 if v is None else v) / 50}" for s, vals in mqm.items() for v in vals])
     chrf = CHRF()
-    chrf_lines = [f"{s} {chrf.sentence_score(h, [r]).score}" for s, hyps in SYSTEMS.items()
-                  for h, r in zip(hyps, REF_A)]
-    _write(f"{d}/metric-scores/{lp}/chrF-refA.seg.score", chrf_lines)
+    _write(f"{d}/metric-scores/{lp}/chrF-{std}.seg.score",
+           [f"{s} {chrf.sentence_score(h, [r]).score}" for s, hyps in systems.items()
+            for h, r in zip(hyps, std_text)])
+
+
+def build_fake_mtme(root: str, testsets=("wmt22",)) -> str:
+    for ts in testsets:
+        _build_testset(root, ts, **LAYOUT[ts])
     return root
 
 

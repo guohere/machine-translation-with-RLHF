@@ -14,10 +14,12 @@ from mtrlhf.rewards import REGISTRY
 from . import stats
 
 # Stored WMT metric scores that should match our own scoring of the same model.
-# exact=True: the stored scores come from the same public checkpoint and settings.
+# exact: True, False, or the set of test sets where the stored scores come from the
+# same public checkpoint and settings. WMT22's COMET-22 / COMETKiwi entries are the
+# submitted systems (ensembles); the WMT23/24 baselines are the released single models.
 SHIPPED_EQUIVALENTS = {
     "cometkiwi22": [("CometKiwi-src", True), ("COMETKiwi-src", False)],
-    "comet22": [("COMET-{ref}", True), ("COMET-22-{ref}", False)],
+    "comet22": [("COMET-{ref}", True), ("COMET-22-{ref}", {"wmt24"})],
     "chrf": [("chrF-{ref}", True)],
     "bleu": [("BLEU-{ref}", False)],
     "metricx24_qe": [("MetricX-24-Hybrid-QE-src", False)],
@@ -69,9 +71,16 @@ def build_matrices(rows: list[dict], value) -> dict[str, tuple[np.ndarray, np.nd
 
 # --- benchmark ----------------------------------------------------------------------
 
-def benchmark(rows: list[dict], values: dict[str, callable], n_boot: int = 1000, seed: int = 0):
-    """Agreement statistics for each scorer in `values` (name -> row -> score)."""
+def benchmark(rows: list[dict], values: dict[str, callable], n_boot: int = 1000, seed: int = 0,
+              pool: list[str] | None = None):
+    """Agreement statistics for each scorer in `values` (name -> row -> score).
+
+    `pool` lists the test sets combined into the headline ("pooled") within-source
+    accuracy, which also drives the reward choice. Other test sets are reported
+    per test set only. None pools all test sets.
+    """
     testsets = sorted({r["testset"] for r in rows})
+    pool_sets = [ts for ts in testsets if pool is None or ts in pool]
     results: dict[str, dict] = {}
     pooled_samples: dict[str, np.ndarray] = {}
     idx_by_ts: dict[str, np.ndarray] = {}
@@ -102,16 +111,17 @@ def benchmark(rows: list[dict], values: dict[str, callable], n_boot: int = 1000,
                 "sys_acc": sys_acc, "sys_pairs": sys_n, "sys_pearson": stats.system_pearson(H, M),
                 "n_items": len(items), "n_systems": len(systems),
             }
-            pooled_correct.append(correct)
-            pooled_count.append(count)
-        if len(res["per_testset"]) == len(testsets) and pooled_count:
+            if ts in pool_sets:
+                pooled_correct.append(correct)
+                pooled_count.append(count)
+        if pooled_count and all(ts in res["per_testset"] for ts in pool_sets):
             c, n = np.concatenate(pooled_correct), np.concatenate(pooled_count)
             if pooled_idx is None or pooled_idx.shape[1] != len(c):
                 pooled_idx = stats.bootstrap_indices(len(c), n_boot, seed + 1)
             samples = stats.bootstrap_ratio(c, n, pooled_idx)
             lo, hi = stats.ci(samples)
             res["pooled"] = {"within_acc": float(c.sum() / n.sum()), "within_lo": lo, "within_hi": hi,
-                             "n_pairs": int(n.sum())}
+                             "n_pairs": int(n.sum()), "testsets": pool_sets}
             pooled_samples[name] = samples
         results[name] = res
     return results, pooled_samples
@@ -144,9 +154,10 @@ def sanity_checks(rows: list[dict], scores: dict[str, dict[str, float]], std_ref
                 if len(pairs) < 10:
                     continue
                 x, y = np.array(pairs).T
+                is_exact = exact if isinstance(exact, bool) else ts in exact
                 out.append({"reward": name, "testset": ts, "stored": stored, "n": len(pairs),
                             "pearson": float(pearsonr(x, y)[0]), "spearman": float(spearmanr(x, y)[0]),
-                            "max_abs_diff": float(np.max(np.abs(x - y))), "expected_identical": exact})
+                            "max_abs_diff": float(np.max(np.abs(x - y))), "expected_identical": is_exact})
     return out
 
 

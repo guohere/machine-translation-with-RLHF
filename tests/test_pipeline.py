@@ -46,3 +46,23 @@ def test_phase1_pipeline(fake_mtme, tmp_path):
     # untranslated output should never beat the reference under chrF
     unt = [p for p in results["probes"] if p["reward"] == "chrf" and p["category"] == "untranslated"]
     assert unt[0]["detection"] == 1.0
+
+
+def test_phase1_pipeline_with_wmt24_reported_separately(tmp_path):
+    from .conftest import build_fake_mtme
+
+    mtme = build_fake_mtme(str(tmp_path / "mtme"), testsets=("wmt22", "wmt24"))
+    run_dir = str(tmp_path / "run")
+    out = run("scripts/p1_build_inputs.py", "--run", run_dir, "--testsets", "wmt22", "wmt24",
+              "--mtme-path", mtme, "--probe-items", "8")
+    # WMT24: refB is the standard reference; outlier MSLC and human system refA are excluded
+    assert "wmt24 en-de: 23 scored translations" in out and "ref=refB, alt_ref=refA" in out
+    run("scripts/p1_score.py", "--run", run_dir, "--rewards", "chrf")
+    summary = run("scripts/p1_analyze.py", "--run", run_dir, "--bootstrap", "100")
+    assert "Within-source acc. (wmt22)" in summary
+    assert "wmt24 is reported in its own column" in summary
+    results = json.load(open(os.path.join(run_dir, "report", "results.json")))
+    assert results["benchmark"]["chrf"]["pooled"]["testsets"] == ["wmt22"]
+    assert set(results["benchmark"]["chrf"]["per_testset"]) == {"wmt22", "wmt24"}
+    sanity = {(s["testset"], s["stored"]) for s in results["sanity"]}
+    assert ("wmt24", "chrF-refB") in sanity

@@ -11,7 +11,7 @@ This document explains how the system works end to end: what each component take
 ```mermaid
 flowchart TB
     subgraph P1["1 · Validate the reward"]
-        H["WMT22–23 en→de<br/>system outputs + expert MQM scores<br/>(mt-metrics-eval)"] --> SC["Score with candidate rewards<br/>CometKiwi-22 · MetricX-24-QE · refs-based"]
+        H["WMT22–24 en→de<br/>system outputs + expert MQM scores<br/>(mt-metrics-eval)"] --> SC["Score with candidate rewards<br/>CometKiwi-22 · MetricX-24-QE · refs-based"]
         SC --> AG["Agreement with humans<br/>within-source accuracy · Kendall τ · system accuracy"]
         PB["Blind-spot probes<br/>omission · number · wrong language · copy …"] --> BS["Blind-spot profile<br/>per reward"]
         AG --> SEL{"Choose R_train<br/>and held-out R_eval"}
@@ -104,13 +104,14 @@ Implementations:
 
 | Data | Used for | Never used for |
 |---|---|---|
-| WMT22–23 en→de outputs + MQM (mt-metrics-eval) | Phase 1 meta-evaluation | Training, final testing |
+| WMT22–23 en→de outputs + MQM (mt-metrics-eval) | Phase 1 meta-evaluation and reward choice | Training, final testing |
+| WMT24 en→de outputs + MQM | Phase 1, reported separately as a check on LLM-era systems | Reward choice, training |
 | Probe set (built from WMT22 references) | Phase 1 blind-spot probes | Training |
 | WMT en-de parallel data (News Commentary, Europarl) | SFT | Evaluation |
 | Prompt pool: 5k English sentences from News Crawl, deduplicated against all test sets | RSFT, DPO, GRPO | Evaluation |
 | FLORES-200 **dev** | Checkpoint selection, over-optimization curves | Final numbers |
 | FLORES-200 **devtest** en→de | **Primary final test** | Any selection or tuning |
-| WMT24 en→de | Secondary final test | Phase 1, selection |
+| WMT24 en→de (sources, references) | Secondary final test | Training, checkpoint selection |
 | FLORES devtest de→en, en→zh | Forgetting check | Training |
 | FLEURS en test, MuST-C tst-COMMON | Speech tests | Training |
 | ASR-corpus utterances (e.g. LibriSpeech) | Noise-aware GRPO (stretch) | Evaluation |
@@ -123,7 +124,7 @@ Implementations:
 
 ### 4.1 Meta-evaluation against expert judgements
 
-**Input.** For WMT22 and WMT23 en→de, `mt-metrics-eval` provides the source segments, the references, every submitted system's outputs, and the expert **MQM** score for each (system, segment). MQM scores are error-weighted: annotators mark error spans with a category and a severity. WMT23 en→de was annotated at paragraph level, so the project uses mt-metrics-eval's sentence-split version (`wmt23.sent`) to match its sentence-level setup. Outlier systems and human translations are excluded, so only MT outputs are compared.
+**Input.** For WMT22 and WMT23 en→de, `mt-metrics-eval` provides the source segments, the references, every submitted system's outputs, and the expert **MQM** score for each (system, segment). MQM scores are error-weighted: annotators mark error spans with a category and a severity. WMT23 en→de was annotated at paragraph level, so the project uses mt-metrics-eval's sentence-split version (`wmt23.sent`) to match its sentence-level setup. Outlier systems and human translations are excluded, so only MT outputs are compared. WMT24 en→de, the newest set with expert scores, is scored too: its systems are mostly LLM-based, closer to what our policy will produce. It is paragraph-level, so it is reported in its own column as a check and is not pooled into the numbers that decide the reward choice.
 
 **Process.**
 1. Score every (source, system output) with each candidate reward. This is inference only and runs on a free T4.
@@ -165,7 +166,7 @@ For each reward and category, measure the **detection rate**, the share of cases
 
 Decision rule, written down before seeing any Phase 2 results:
 
-1. **R_train** is the reference-free (QE) candidate with the highest within-source accuracy. Ties are broken by blind-spot coverage, then by cost; it must fit inside GRPO on 24 GB.
+1. **R_train** is the reference-free (QE) candidate with the highest within-source accuracy, pooled over WMT22 + WMT23. Ties are broken by blind-spot coverage, then by cost; it must fit inside GRPO on 24 GB.
 2. **R_eval** is the strongest available metric **from a different model family** than R_train, used *with references*. The default expectation is R_train = CometKiwi-22 and R_eval = MetricX-24 with references, but the data decides.
 3. COMET-22 stays as a secondary evaluator. It is marked "same family" whenever R_train is a COMET model.
 

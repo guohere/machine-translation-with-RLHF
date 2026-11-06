@@ -27,7 +27,7 @@ from mtrlhf.meta_eval.probes import build_probe_rows  # noqa: E402
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run", default="runs/p1", help="output directory")
-    ap.add_argument("--testsets", nargs="+", default=["wmt22", "wmt23.sent"])
+    ap.add_argument("--testsets", nargs="+", default=["wmt22", "wmt23.sent", "wmt24"])
     ap.add_argument("--lp", default="en-de")
     ap.add_argument("--mtme-path", default=None,
                     help="mt-metrics-eval data dir (default: ~/.mt-metrics-eval/mt-metrics-eval-v2)")

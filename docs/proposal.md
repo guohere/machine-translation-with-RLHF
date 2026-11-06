@@ -54,7 +54,7 @@ The mechanics of each component are in [`workflow.md`](workflow.md). This sectio
 
 ### Phase 1: Validate the reward (QE study, scoring only)
 
-- **Human judgements:** WMT22 and WMT23 English→German system outputs with expert **MQM** scores, loaded via Google's [`mt-metrics-eval`](https://github.com/google-research/mt-metrics-eval).
+- **Human judgements:** WMT22, WMT23 and WMT24 English→German system outputs with expert **MQM** scores, loaded via Google's [`mt-metrics-eval`](https://github.com/google-research/mt-metrics-eval). WMT22 and WMT23 (sentence-level) decide the reward choice. WMT24, the newest en→de set with expert scores, consists mostly of LLM-based systems, closer to what the policy will produce. It is paragraph-level, so it is reported separately as a check and does not influence the choice.
 - **Candidate rewards (core):** CometKiwi-22 (≈0.5B, reference-free) and MetricX-24-hybrid-large in QE mode (≈1.2B, reference-free).
   - **Reference-based comparisons:** COMET-22, MetricX-24 with references, chrF and BLEU.
   - **Stretch candidates:** CometKiwi-23-XL, xCOMET-XL in QE mode, and an LLM judge.
@@ -63,7 +63,7 @@ The mechanics of each component are in [`workflow.md`](workflow.md). This sectio
   - **segment-level Kendall τ and tie-calibrated pairwise accuracy** (*acc_eq*; Deutsch et al., 2023);
   - **system-level pairwise accuracy;**
   - bootstrap confidence intervals and significance tests between rewards.
-- **Sanity check:** reproduce one officially reported WMT23 correlation before trusting the pipeline.
+- **Sanity checks:** our CometKiwi, COMET-22 and chrF scores must reproduce the scores stored with the WMT data for the same public models, and our statistics must match mt-metrics-eval's own implementation.
 - **Blind-spot probes:** take about 500 good en→de translations and apply controlled perturbations. The categories are omission, addition, number change, named-entity swap, negation flip, untranslated copy, wrong target language, word-order damage, repetition and formality flip (*Sie*/*du*). Measure how often each reward scores the perturbed version lower (the detection rate). This follows the ideas of ACES and DEMETR.
 - **Decision:** the training reward **R_train** is the candidate with the best within-source accuracy that is also cheap enough to run inside GRPO on 24 GB. The held-out reward **R_eval** is the strongest candidate from a *different model family*: if R_train is CometKiwi, R_eval is MetricX-24 with references, and vice versa.
 
@@ -149,10 +149,10 @@ Only the method changes. Checkpoints are selected on FLORES-200 *dev*. Test sets
 
 | Set | Use |
 |---|---|
-| WMT22–23 en→de + MQM | Phase 1 only |
+| WMT22–23 en→de + MQM | Phase 1 only (reward choice) |
 | FLORES-200 dev | Checkpoint selection, over-optimization curves |
 | **FLORES-200 devtest en→de** | **Primary text test set** |
-| WMT24 en→de | Secondary text test set (newer, harder; not used in Phase 1) |
+| WMT24 en→de | Secondary text test set (newer, harder). Also scored in Phase 1 as a separate check on LLM-era systems, never used for the reward choice |
 | FLORES-200 devtest de→en, en→zh | Forgetting check |
 | FLEURS en (test), MuST-C tst-COMMON | Speech test sets |
 
@@ -173,7 +173,7 @@ Only the method changes. Checkpoints are selected on FLORES-200 *dev*. Test sets
 
 | Resource | Use | License / terms |
 |---|---|---|
-| mt-metrics-eval (WMT22–23 en→de) | Human judgements for Phase 1 | Apache-2.0 code; WMT data terms |
+| mt-metrics-eval (WMT22–24 en→de) | Human judgements for Phase 1 | Apache-2.0 code; WMT data terms |
 | WMT en-de training data (News Commentary, Europarl) and News Crawl | SFT data, prompt pool | Per-corpus terms (research use) |
 | FLORES-200 | Text dev/test | CC BY-SA 4.0 |
 | FLEURS | Speech test | CC BY 4.0 |
@@ -191,7 +191,7 @@ This is a non-commercial research project. Gated models require accepting their 
 
 | Step | Hardware | Rough GPU-hours |
 |---|---|---|
-| Phase 1: score WMT22–23 en→de with 2–4 rewards; probes | Free T4 (Kaggle / Colab) | 2–6 |
+| Phase 1: score WMT22–24 en→de with 2–4 rewards; probes | Free T4 (Kaggle / Colab) | 3–8 |
 | SFT (1.5B, LoRA, ~30k pairs) | 24 GB (RTX 4090 / L4 / A10) | 1–3 |
 | Sample and score 5k × 8 candidates (vLLM) | 24 GB | 1–2 |
 | RSFT and DPO | 24 GB | 2–4 |
