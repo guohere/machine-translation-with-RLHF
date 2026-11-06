@@ -1,220 +1,181 @@
 # Machine Translation with RLHF
 
-**Aligning a small LLM translator with human preferences, using reward models, DPO and GRPO, and checking that the gains are real rather than reward hacking.**
+**Validate the reward, optimize it, and find where it breaks.** This is a controlled study of reward-guided fine-tuning for English→German machine translation, extended to cascaded speech translation.
 
-> **Status: 🚧 design phase.** This README is the project's design document. The commands and repository layout below are the *target* interface, and the results table fills in as each experiment finishes.
+> **Status: 🚧 proposal stage.** The design is complete: see the [project proposal](docs/proposal.md) and the [system workflow](docs/workflow.md). Implementation starts with Phase 1, and the benchmark tables below fill in as experiments finish.
 
 ---
 
-## Why this project
+## The idea
 
-Neural machine translation (NMT) systems are usually trained with maximum likelihood: they learn to imitate a single reference translation. This has three problems:
+RL fine-tuning (DPO, GRPO) lets a translation model optimize a quality metric instead of imitating one reference translation. But a model can only be as good as its reward: **whatever the reward cannot see, the policy is free to exploit.** This project therefore treats the reward as the main object of study and runs the whole loop:
 
-1. **References are noisy and singular.** A sentence has many good translations, but MLE rewards only one, and it also teaches the model whatever errors the reference contains.
-2. **The training objective is not the goal.** People judge translations on adequacy, fluency and terminology, not on token overlap with a reference.
-3. **Exposure bias.** The model is trained on gold prefixes but has to decode from its own outputs.
-
-Reinforcement learning from human feedback (RLHF) and preference optimization changed how general-purpose LLMs are aligned. This project asks whether the same toolkit makes a **small (~1.5B) open LLM a better translator**, judged by **held-out metrics and humans**. The main risk is *Goodhart's law*: a model trained against a quality metric learns to game that metric, so the project treats separating real gains from reward hacking as a core deliverable.
-
-## Research questions
-
-| # | Question |
-|---|----------|
-| **RQ1** | Does preference optimization (offline **DPO**, online **GRPO**) beat a strong supervised fine-tuning (SFT) baseline on held-out metrics and in blind human evaluation? |
-| **RQ2** | Which feedback signal works best: a reference-based metric (COMET), reference-free quality estimation (CometKiwi), a **learned reward model** trained on human preferences, or a composite of these? |
-| **RQ3** | How much **reward hacking** occurs (off-target language, length exploitation, hallucination, copying the source), and which mitigations work (KL control, composite rewards, explicit penalties)? |
-| **RQ4** | Is training-time alignment worth it compared with **inference-time** quality-aware decoding (best-of-N reranking with a QE model)? And can an aligned 1.5B model close the gap to a 7B model? |
-
-## Scope
-
-| | Default choice | Rationale |
+| Phase | Question | Output |
 |---|---|---|
-| Language pairs | **Chinese → English** and **English → Chinese** | High-resource pair with recent WMT test sets. A native speaker can run the human evaluation. |
-| Policy model | `Qwen2.5-1.5B-Instruct` with LoRA | Strong multilingual base that trains on a single GPU. Any Hugging Face causal LM can be swapped in through the config. |
-| Reference "big" model | `Qwen2.5-7B-Instruct` (zero-shot) | Gives an upper bound for the "small aligned model vs. large model" comparison. |
-| Compute budget | 1× 24–80 GB GPU | Keeps the project reproducible for individuals. |
-
-## Approach
+| **1 · Validate the reward** | Which quality-estimation model agrees best with expert human judgements *when comparing translations of the same sentence*, and what are its blind spots? | Reward benchmark, blind-spot profile, and the choice of training reward |
+| **2 · Optimize it** | Which method uses that reward best: best-of-N, rejection-sampling fine-tuning, DPO or GRPO? | Method benchmark: same start, same prompts, same reward budget |
+| **3 · Close the loop** | Where did the training reward go up while real quality didn't, and did Phase 1 predict it? | Reward-hacking analysis with a held-out metric and a human check |
+| **4 · Speech** | In a Whisper → MT cascade, are RL-tuned models more robust to recognition errors? | Robustness curves (quality vs. WER) and latency |
 
 ```mermaid
 flowchart LR
-    A[Parallel data<br/>WMT / News Commentary] --> B[Stage 1<br/>SFT with LoRA]
-    B --> C[Sample K candidates<br/>per source with vLLM]
-    C --> D{Stage 2<br/>Reward signals}
-    D -->|CometKiwi QE| E[Preference pairs]
-    D -->|COMET-22 w/ ref| E
-    H[Human pairwise<br/>annotations] --> F[Learned reward model<br/>Bradley–Terry]
-    E --> F
-    E --> G1[Stage 3a<br/>DPO offline]
-    F --> G2[Stage 3b<br/>GRPO online]
-    D --> G2
-    G1 --> I[Stage 4<br/>Evaluation]
-    G2 --> I
-    B --> I
-    I --> J[Held-out metrics<br/>MetricX-24, chrF, BLEU]
-    I --> K[Blind human A/B<br/>+ hacking diagnostics]
+    A["WMT expert ratings<br/>(MQM)"] --> B["1 · Validate reward<br/>accuracy + blind spots"]
+    B -->|R_train| C["2 · Optimize<br/>Best-of-N · RSFT · DPO · GRPO"]
+    D["SFT model<br/>Qwen2.5-1.5B + LoRA"] --> C
+    C --> E["3 · Close the loop<br/>held-out R_eval · human check"]
+    B -.->|blind spots predict exploits| E
+    C --> F["4 · Speech cascade<br/>Whisper → MT"]
 ```
 
-### Stage 0: Data
+### Why within-source comparisons matter
 
-- **SFT data:** about 50k zh↔en sentence pairs from WMT training data (e.g. News Commentary), **filtered by QE score** so that the model imitates only high-quality references.
-- **RL prompts:** source-side sentences only. Because the main reward is reference-free, online RL can use *monolingual* text, which is cheap and plentiful.
-- **Evaluation:** WMT23 general test sets (zh→en, en→zh) and FLORES-200 `devtest`. No test data is used for training, filtering or checkpoint selection. FLORES `dev` is the validation set.
+Best-of-N picks the top candidate for a sentence. DPO learns from a better/worse pair for a sentence. GRPO normalizes rewards within a group of samples for a sentence. **All of them use the reward only to compare translations of the same source.** Phase 1 therefore measures exactly that, *within-source ranking accuracy* against expert judgements, and not just the usual global correlation.
 
-### Stage 1: Supervised fine-tuning (baseline)
+## Setup at a glance
 
-LoRA fine-tuning with a fixed translation prompt template. This is the reference policy for both DPO and GRPO, and it is the baseline every later model has to beat.
+| | Choice |
+|---|---|
+| Language pair | **English → German.** One high-resource pair, so that the effect of the training method can be isolated |
+| Policy | Qwen2.5-1.5B-Instruct + LoRA (0.5B for debugging) |
+| Reward candidates | CometKiwi-22 (QE) and MetricX-24 in QE mode. COMET-22, MetricX-24 with references and chrF serve as reference-based comparisons |
+| Human judgements | WMT22–23 en→de MQM via [`mt-metrics-eval`](https://github.com/google-research/mt-metrics-eval) |
+| Alignment methods | Best-of-N reranking · rejection-sampling FT (RSFT) · DPO · GRPO · GRPO + guards |
+| Anchors | OPUS-MT en-de (classic NMT) · Qwen2.5-1.5B zero-shot · Qwen2.5-7B zero-shot |
+| Text test sets | FLORES-200 devtest (primary), WMT24 en→de (secondary); de→en and en→zh as a forgetting check |
+| Speech test sets | FLEURS (English), MuST-C tst-COMMON (en→de). ASR: Whisper tiny → large-v3-turbo |
+| Hardware | One 24 GB GPU; free T4s for debugging and Phase 1 scoring. About 25–45 GPU-hours in total |
 
-### Stage 2: Reward signals
+## Rules of the experiment
 
-| Signal | Type | Used for |
+- **Change one thing at a time.** Every alignment method starts from the same SFT checkpoint and uses the same 5k prompts and the same reward budget (5k prompts × 8 samples = 40k reward calls).
+- **Never grade a model with its own reward.** Final quality is judged by a reward from a *different model family* (R_eval), by reference-based metrics and by a human check. The training reward (R_train) is reported only to show the over-optimization gap.
+- **Select on dev, test once.** Checkpoints are chosen on FLORES dev, and test sets are scored once per final system.
+- **Report uncertainty.** System differences come with paired-bootstrap 95% confidence intervals.
+
+## Benchmarks
+
+*Results are filled in as experiments complete.*
+
+**A · Reward models vs. expert judgements** (WMT22–23 en→de, MQM)
+
+| Reward | Needs reference | Within-source acc. ↑ | Segment Kendall τ ↑ | System pairwise acc. ↑ | Probe detection ↑ | Throughput |
+|---|---|---|---|---|---|---|
+| CometKiwi-22 | no | – | – | – | – | – |
+| MetricX-24 (QE) | no | – | – | – | – | – |
+| COMET-22 | yes | – | – | – | – | – |
+| MetricX-24 (ref) | yes | – | – | – | – | – |
+| chrF | yes | – | – | – | – | – |
+
+**B · Alignment methods** (FLORES-200 devtest, en→de)
+
+| System | R_eval ↑ | COMET-22 ↑ | chrF ↑ | R_train ↑ *(trained on)* | Exploit rate ↓ | Inference cost |
+|---|---|---|---|---|---|---|
+| OPUS-MT en-de | – | – | – | – | – | 1× (≈74M params) |
+| Qwen2.5-1.5B zero-shot | – | – | – | – | – | 1× |
+| Qwen2.5-7B zero-shot | – | – | – | – | – | ≈5× params |
+| SFT | – | – | – | – | – | 1× |
+| SFT + best-of-8 | – | – | – | – | – | 8 samples + 8 reward calls |
+| RSFT | – | – | – | – | – | 1× |
+| DPO | – | – | – | – | – | 1× |
+| GRPO | – | – | – | – | – | 1× |
+| GRPO + guards | – | – | – | – | – | 1× |
+
+**C · Speech cascade** (Whisper → MT, FLEURS English → German)
+
+| MT system | Gold transcript | Whisper-tiny | Whisper-small | Whisper-large-v3-turbo | Drop gold → tiny |
+|---|---|---|---|---|---|
+| *ASR WER* | *0* | – | – | – | |
+| SFT | – | – | – | – | – |
+| DPO | – | – | – | – | – |
+| GRPO | – | – | – | – | – |
+
+## How it works
+
+| Phase | In short | Details |
 |---|---|---|
-| **CometKiwi** (`wmt22-cometkiwi-da`) | Reference-free QE | Main RL reward and preference-pair labelling |
-| **COMET-22** (`wmt22-comet-da`) | Reference-based | Preference labelling when a reference exists |
-| **Learned reward model** | Bradley–Terry model on the SFT backbone | Trained on metric-derived pairs plus a small set of human pairwise judgements, then validated by agreement with held-out human labels |
-| **Penalties** | Rule-based | Wrong output language, extreme length ratio, verbatim source copying, repetition |
+| 1 | Score WMT system outputs (already rated by experts) with each candidate reward and measure agreement. Perturb good translations (omissions, number changes, wrong language …) to map each reward's blind spots. Pick R_train and a held-out R_eval from another model family. | [workflow §4](docs/workflow.md#4-phase-1-validate-the-reward) |
+| 2 | SFT a LoRA adapter, sample 8 candidates per prompt and score them with R_train, then run best-of-N, RSFT, DPO and GRPO from the same checkpoint. | [workflow §5](docs/workflow.md#5-phase-2-optimize-the-reward) |
+| 3 | Evaluate with R_eval, COMET-22 and chrF. Track over-optimization curves, run hacking diagnostics, audit "suspicious wins", do a human A/B check, and test forgetting on untrained directions. | [workflow §6](docs/workflow.md#6-phase-3-close-the-loop) |
+| 4 | Transcribe English audio with five Whisper sizes, translate with every MT system, and plot translation quality against WER. Measure latency. | [workflow §7](docs/workflow.md#7-phase-4-cascaded-speech-translation) |
 
-**Preference pairs** are built by sampling *K* = 8 translations per source from the SFT model, scoring them, and keeping the (best, worst) pair only when the score margin is above a threshold. This filters out pairs where the metric can't tell the candidates apart.
-
-### Stage 3: Preference optimization
-
-- **3a. DPO (offline):** trains directly on preference pairs, with no reward model at train time. It is cheap and stable, so it serves as the first alignment baseline.
-- **3b. GRPO (online):** samples a group of translations per source, scores them with the reward, and uses group-relative advantages, so no value network is needed. A KL penalty to the SFT policy limits drift. This is where the composite reward and the anti-hacking penalties are tested.
-- *(Optional)* **CPO**, the translation-specific preference objective used in ALMA-R, as an extra comparison.
-
-### Stage 4: Evaluation
-
-The rule is that **the metric a model was trained on is never its headline metric.**
-
-| Metric | Role |
-|---|---|
-| **MetricX-24** (↓) | Primary *held-out* automatic metric (different model family from the COMET rewards) |
-| COMET-22 | Secondary. Reported, but marked as non-held-out for models trained on it |
-| chrF / BLEU (sacreBLEU) | Surface-overlap sanity checks |
-| CometKiwi | The training reward, shown for transparency to reveal over-optimization |
-| **Human A/B** | 200 segments per direction, blind pairwise (SFT vs. best aligned model), 2 annotators, win rate with Cohen's κ |
-| LLM-as-judge | Cheap pairwise preference at scale, calibrated against the human labels |
-
-## Guarding against reward hacking
-
-A model trained on a learned metric will find that metric's blind spots, so every run logs these diagnostics:
-
-| Failure mode | Detector |
-|---|---|
-| Off-target language | Language-ID rate on outputs |
-| Length exploitation | Output/source length-ratio distribution |
-| Untranslated copying | Character overlap between source and output |
-| Hallucination / omission | Low cross-lingual source–output similarity (e.g. LaBSE) |
-| Over-optimization | Divergence between the training reward (↑) and held-out MetricX (↓). The checkpoint is chosen on the held-out metric |
-
-The mitigations under study are KL coefficient sweeps, the composite reward (QE + learned RM), and explicit penalties. Each is reported as an ablation.
-
-## Experiment matrix
-
-| ID | System | Feedback signal | Answers |
-|---|---|---|---|
-| E0 | Qwen2.5-1.5B zero-shot | none | Lower bound |
-| E1 | SFT | references | Baseline |
-| E2 | SFT + best-of-8 QE reranking | CometKiwi (inference time) | RQ4 |
-| E3 | DPO | CometKiwi pairs | RQ1, RQ2 |
-| E4 | DPO | learned RM / human pairs | RQ2 |
-| E5 | GRPO | CometKiwi | RQ1, RQ3 |
-| E6 | GRPO | composite (QE + RM − penalties) | RQ2, RQ3 |
-| E7 | Qwen2.5-7B zero-shot | none | RQ4 upper reference |
-
-## Results
-
-*To be filled as experiments complete (WMT23, zh→en / en→zh).*
-
-| ID | System | MetricX-24 ↓ | COMET-22 ↑ | chrF ↑ | BLEU ↑ | CometKiwi ↑ *(train reward)* | Off-target % ↓ | Human win rate vs. SFT |
-|---|---|---|---|---|---|---|---|---|
-| E0 | Zero-shot | – | – | – | – | – | – | – |
-| E1 | SFT | – | – | – | – | – | – | – |
-| E2 | SFT + QE rerank | – | – | – | – | – | – | – |
-| E3 | DPO (QE pairs) | – | – | – | – | – | – | – |
-| E5 | GRPO (QE) | – | – | – | – | – | – | – |
-| E6 | GRPO (composite) | – | – | – | – | – | – | – |
-| E7 | 7B zero-shot | – | – | – | – | – | – | – |
+A worked example that follows one sentence through the whole system is in [workflow §8](docs/workflow.md#8-end-to-end-walkthrough-one-sentence-through-the-system).
 
 ## Repository layout (planned)
 
 ```
 machine-translation-with-RLHF/
-├── configs/                 # YAML configs, one per stage / experiment
-│   ├── sft.yaml
-│   ├── reward_model.yaml
-│   ├── dpo.yaml
-│   └── grpo.yaml
-├── scripts/
-│   ├── prepare_data.py      # download, clean, QE-filter parallel data
-│   ├── generate_candidates.py   # K samples per source with vLLM
-│   ├── build_preferences.py     # score candidates → (chosen, rejected) pairs
-│   └── evaluate.py          # all metrics + hacking diagnostics → reports/
+├── configs/            # one YAML per experiment: sft, rsft, dpo, grpo, grpo_guarded, …
+├── docs/               # proposal.md, workflow.md
+├── scripts/            # thin CLIs, one per pipeline step: p1_*, p2_*, p3_*, p4_*
 ├── src/mtrlhf/
-│   ├── data/                # prompt templates, dataset builders
-│   ├── rewards/             # cometkiwi.py, comet.py, reward_model.py, composite.py, penalties.py
-│   ├── train/               # sft.py, reward_model.py, dpo.py, grpo.py (thin wrappers over TRL)
-│   └── eval/                # metrics.py, hacking_checks.py, llm_judge.py, human_eval.py
-├── human_eval/              # annotation guidelines, blinded sheets, agreement analysis
-├── reports/                 # result tables and figures
+│   ├── rewards/        # one interface: score(src, hyp, ref=None) → higher is better
+│   ├── meta_eval/      # mt-metrics-eval loader, agreement statistics, blind-spot probes
+│   ├── data/           # parallel data, prompt pool, test-set loaders, prompt template
+│   ├── decode/         # vLLM sampling, best-of-N (MBR as a stretch goal)
+│   ├── train/          # SFT, RSFT, DPO, GRPO wrappers around TRL
+│   ├── eval/           # metrics, hacking diagnostics, bootstrap tests
+│   └── speech/         # Whisper ASR, WER, cascade, latency
+├── human_eval/         # annotation guidelines and blinded sheets
+├── reports/            # tables and figures per phase
 └── tests/
 ```
 
-## Getting started (target interface)
+## Quickstart (target interface)
 
 ```bash
-# 1. Environment
 pip install -e ".[dev]"
+```
 
-# 2. Data
-python scripts/prepare_data.py --pairs zh-en en-zh --qe-filter 0.80
+```bash
+# Phase 1: reward benchmark and blind spots
+python scripts/p1_meta_eval.py --testsets wmt22 wmt23 --lp en-de --rewards cometkiwi22 metricx24_qe comet22 chrf
+python scripts/p1_probes.py --rewards cometkiwi22 metricx24_qe
+```
 
-# 3. Supervised baseline
-python -m mtrlhf.train.sft --config configs/sft.yaml
+```bash
+# Phase 2: SFT, then alignment from the same checkpoint
+python scripts/p2_prepare_data.py
+python scripts/p2_train.py --config configs/sft.yaml
+python scripts/p2_sample_and_score.py --policy ckpt/sft --n 8 --reward cometkiwi22
+python scripts/p2_train.py --config configs/dpo.yaml   # also rsft.yaml, grpo.yaml, grpo_guarded.yaml
+```
 
-# 4. Build preference data from SFT samples
-python scripts/generate_candidates.py --model outputs/sft --num-samples 8
-python scripts/build_preferences.py --scorer cometkiwi --min-margin 0.05
+```bash
+# Phase 3: evaluation and hacking report
+python scripts/p3_evaluate.py --systems all --testsets flores_devtest wmt24
+python scripts/p3_hacking_report.py
+```
 
-# 5. Align
-python -m mtrlhf.train.dpo  --config configs/dpo.yaml
-python -m mtrlhf.train.grpo --config configs/grpo.yaml
-
-# 6. Evaluate on held-out test sets
-python scripts/evaluate.py --model outputs/grpo --testset wmt23 \
-    --metrics metricx24,comet22,chrf,bleu --hacking-checks
+```bash
+# Phase 4: speech cascade
+python scripts/p4_transcribe.py --whisper tiny base small medium large-v3-turbo --testsets fleurs_en mustc_tst_common
+python scripts/p4_cascade_eval.py --systems all
 ```
 
 ## Roadmap
 
-- [ ] Data pipeline with QE filtering, plus WMT23 / FLORES-200 loaders
-- [ ] Evaluation harness (metrics, hacking diagnostics, LLM judge) *built first, so every later stage is measured the same way*
-- [ ] E0–E1: zero-shot and SFT baselines
-- [ ] E2: best-of-N QE reranking
-- [ ] Candidate generation and preference-pair construction
-- [ ] E3: DPO
-- [ ] Human annotation round 1 (pairwise) → learned reward model → E4
-- [ ] E5–E6: GRPO with QE and composite rewards, plus KL / penalty ablations
-- [ ] Human A/B evaluation of the best system vs. SFT
-- [ ] Write-up: results, failure-mode gallery, lessons learned
+- [ ] **M1** Reward interface, mt-metrics-eval loader, reward benchmark (A), blind-spot probes → choose R_train / R_eval
+- [ ] **M2** Data pipeline, SFT, evaluation harness, anchors, best-of-N curve
+- [ ] **M3** Sampling and scoring, RSFT, DPO ← *minimum viable project*
+- [ ] **M4** GRPO, KL sweep, guarded GRPO, over-optimization curves → benchmark B
+- [ ] **M5** Hacking diagnostics, predicted vs. observed exploits, human check, forgetting check
+- [ ] **M6** Whisper sweep, cascade evaluation, latency → benchmark C; final write-up
+- [ ] *Stretch:* CPO · MBR · cross-reward GRPO (2×2) · noise-aware GRPO on ASR transcripts
 
 ## Tech stack
 
-PyTorch · Hugging Face Transformers, PEFT (LoRA) and **TRL** (SFT / Reward / DPO / GRPO trainers) · **vLLM** for fast sampling · `unbabel-comet` · MetricX · sacreBLEU · Weights & Biases
+PyTorch · Hugging Face Transformers, PEFT and **TRL** (SFT / DPO / GRPO) · **vLLM** · `unbabel-comet` · MetricX · `mt-metrics-eval` · sacreBLEU · Whisper · jiwer · Weights & Biases
 
-## References
+## Licenses and data terms
 
-- Ouyang et al. (2022). *Training language models to follow instructions with human feedback.*
-- Rafailov et al. (2023). *Direct Preference Optimization: Your Language Model is Secretly a Reward Model.*
-- Shao et al. (2024). *DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models* (introduces GRPO).
-- Xu et al. (2024). *Contrastive Preference Optimization: Pushing the Boundaries of LLM Performance in Machine Translation.*
-- He et al. (2024). *Improving Machine Translation with Human Feedback: An Exploration of Quality Estimation as a Reward Model.*
-- Gao et al. (2023). *Scaling Laws for Reward Model Overoptimization.*
-- Fernandes et al. (2022). *Quality-Aware Decoding for Neural Machine Translation.*
-- Rei et al. (2022). *COMET-22* and *CometKiwi*, WMT 2022 shared-task submissions.
-- Juraska et al. (2024). *MetricX-24: The Google Submission to the WMT 2024 Metrics Shared Task.*
-- Freitag et al. (2021). *Experts, Errors, and Context: A Large-Scale Study of Human Evaluation for Machine Translation.*
+The code is released under the [MIT License](LICENSE). Some models and datasets have their own terms:
 
-## License
+- **CometKiwi** (`Unbabel/wmt22-cometkiwi-da`) is **gated** on Hugging Face and licensed **CC BY-NC-SA 4.0, for non-commercial use only**. Accept the license on its model page before downloading.
+- **MuST-C** is CC BY-NC-ND 4.0 and requires registration. FLORES-200 is CC BY-SA 4.0, and FLEURS is CC BY 4.0.
+- MetricX-24, COMET-22, the Qwen2.5 (0.5B/1.5B/7B) models and Whisper are under permissive licenses (Apache-2.0 / MIT).
 
-Code is released under the [MIT License](LICENSE). Some evaluation and reward models have their own licenses: CometKiwi and xCOMET are CC BY-NC-SA 4.0, for non-commercial research use only.
+This is a non-commercial research project.
+
+## Key references
+
+Rafailov et al. 2023 (DPO) · Shao et al. 2024 (GRPO) · Gulcehre et al. 2023 (ReST) · Xu et al. 2024 (CPO) · He et al. 2024 (QE as a reward model for MT) · Gao et al. 2023 (reward over-optimization) · Freitag et al. 2021 (MQM) · Deutsch et al. 2023 (tie-calibrated meta-evaluation) · Juraska et al. 2024 (MetricX-24) · Radford et al. 2023 (Whisper). The full list is in the [proposal](docs/proposal.md#references).
