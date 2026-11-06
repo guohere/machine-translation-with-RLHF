@@ -1,0 +1,17 @@
+{
+  "reward": "metricx24_ref",
+  "kind": "metricx",
+  "model_id": "google/metricx-24-hybrid-large-v2p6",
+  "needs_reference": true,
+  "family": "metricx",
+  "name": "metricx24_ref",
+  "device": "cuda",
+  "gpu": "Tesla T4",
+  "n_gpus": 2,
+  "n_rows": 42599,
+  "n_unique": 32159,
+  "load_seconds": 14.6,
+  "score_seconds": 1134.8,
+  "inputs_per_second": 28.34,
+  "peak_gpu_mem_gb": 8.58
+}
