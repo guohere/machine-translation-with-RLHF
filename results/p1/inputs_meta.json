@@ -1,0 +1,136 @@
+{
+  "lp": "en-de",
+  "testsets": {
+    "wmt22": {
+      "testset": "wmt22",
+      "lp": "en-de",
+      "gold": "mqm",
+      "gold_flipped": false,
+      "std_ref": "refA",
+      "alt_ref": "refB",
+      "systems": [
+        "JDExploreAcademy",
+        "Lan-Bridge",
+        "Online-A",
+        "Online-B",
+        "Online-G",
+        "Online-W",
+        "Online-Y",
+        "OpenNMT",
+        "PROMT",
+        "QUARTZ_TuneReranking",
+        "bleu_bestmbr",
+        "bleurt_bestmbr",
+        "chrf_bestmbr",
+        "comet_bestmbr"
+      ],
+      "excluded_systems": [
+        "M2M100_1.2B-B4",
+        "refA",
+        "refB"
+      ],
+      "n_rows": 17095,
+      "n_items": 1315,
+      "shipped_metrics": [
+        "BLEU-refA",
+        "BLEURT-20-refA",
+        "COMET-22-refA",
+        "COMETKiwi-src",
+        "chrF-refA"
+      ]
+    },
+    "wmt23.sent": {
+      "testset": "wmt23.sent",
+      "lp": "en-de",
+      "gold": "mqm",
+      "gold_flipped": false,
+      "std_ref": "refA",
+      "alt_ref": null,
+      "systems": [
+        "GPT4-5shot",
+        "Lan-BridgeMT",
+        "ONLINE-A",
+        "ONLINE-B",
+        "ONLINE-G",
+        "ONLINE-M",
+        "ONLINE-W",
+        "ONLINE-Y",
+        "ZengHuiMT"
+      ],
+      "excluded_systems": [
+        "refA"
+      ],
+      "n_rows": 14049,
+      "n_items": 1561,
+      "shipped_metrics": []
+    },
+    "wmt24": {
+      "testset": "wmt24",
+      "lp": "en-de",
+      "gold": "mqm",
+      "gold_flipped": false,
+      "std_ref": "refB",
+      "alt_ref": "refA",
+      "systems": [
+        "AIST-AIRC",
+        "Aya23",
+        "CUNI-NL",
+        "Claude-3.5",
+        "CommandR-plus",
+        "CycleL",
+        "CycleL2",
+        "Dubformer",
+        "GPT-4",
+        "Gemini-1.5-Pro",
+        "IKUN",
+        "IKUN-C",
+        "IOL_Research",
+        "Llama3-70B",
+        "Mistral-Large",
+        "NVIDIA-NeMo",
+        "ONLINE-A",
+        "ONLINE-B",
+        "ONLINE-G",
+        "ONLINE-W",
+        "Occiglot",
+        "Phi-3-Medium",
+        "TSU-HITs",
+        "TranssionMT",
+        "Unbabel-Tower70B"
+      ],
+      "excluded_systems": [
+        "MSLC",
+        "refA",
+        "refB"
+      ],
+      "n_rows": 7792,
+      "n_items": 487,
+      "shipped_metrics": [
+        "BLEU-refB",
+        "BLEURT-20-refB",
+        "COMET-22-refB",
+        "CometKiwi-src",
+        "MetricX-24-Hybrid-QE-src",
+        "MetricX-24-Hybrid-refB",
+        "XCOMET-QE-src",
+        "XCOMET-refB",
+        "chrF-refB"
+      ]
+    }
+  },
+  "probe_testset": "wmt22",
+  "probe_counts": {
+    "original": 500,
+    "omission": 344,
+    "addition": 500,
+    "number": 82,
+    "untranslated": 500,
+    "wrong_language": 500,
+    "word_order": 497,
+    "repetition": 497,
+    "named_entity": 152,
+    "negation": 91
+  },
+  "seed": 13,
+  "mtme_path": "/root/.mt-metrics-eval/mt-metrics-eval-v2"
+}
