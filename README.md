@@ -119,7 +119,7 @@ Planned for later phases: `configs/`, `src/mtrlhf/{data,decode,train,eval,speech
 
 ## Running Phase 1
 
-**On Kaggle or Colab (recommended).** Open [`notebooks/p1_reward_benchmark.ipynb`](notebooks/p1_reward_benchmark.ipynb), choose a T4 GPU, add a Hugging Face token as the `HF_TOKEN` secret (after accepting the [CometKiwi license](https://huggingface.co/Unbabel/wmt22-cometkiwi-da)), and run all cells. It takes about 1–2 hours and produces `p1_results.zip`.
+**On Kaggle or Colab (recommended).** Open [`notebooks/p1_reward_benchmark.ipynb`](notebooks/p1_reward_benchmark.ipynb), choose a T4 GPU, add a Hugging Face token as the `HF_TOKEN` secret (after accepting the [CometKiwi license](https://huggingface.co/Unbabel/wmt22-cometkiwi-da)), and run all cells. It takes about 1.5–2 hours. With an optional `GH_TOKEN` secret (a fine-grained GitHub token for this repository with *Contents: Read and write*), the notebook pushes the scores to `results/p1/` after each reward. Results then survive a stopped session, and a re-run continues where the last one stopped.
 
 **Anywhere else:**
 
