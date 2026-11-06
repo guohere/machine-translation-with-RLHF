@@ -98,4 +98,4 @@ Within-source accuracy of metrics whose scores ship with the WMT data, including
 
 - **R_train (training reward): `metricx24_qe`**
 - **R_eval (held-out evaluator): `comet22`**
-- metricx24_qe beats cometkiwi22 on within-source accuracy (diff -0.022, 95% CI [-0.034, -0.012]).
+- metricx24_qe beats cometkiwi22 on within-source accuracy by 2.2 points (95% CI [1.2, 3.4]).

@@ -52,3 +52,12 @@ def test_choose_rewards_ties_go_to_faster_reward():
     cmp = [{"a": "cometkiwi22", "b": "metricx24_qe", "diff": 0.01, "lo": -0.02, "hi": 0.04, "p": 0.4}]
     metas = {"cometkiwi22": {"inputs_per_second": 20}, "metricx24_qe": {"inputs_per_second": 60}}
     assert analysis.choose_rewards(res, cmp, metas, list(res))["r_train"] == "metricx24_qe"
+
+
+def test_choice_note_reports_positive_margin_for_winner():
+    # the comparison is stored as (loser - winner), as in the real Phase 1 run
+    res = {"cometkiwi22": {"pooled": {"within_acc": 0.62}}, "metricx24_qe": {"pooled": {"within_acc": 0.64}}}
+    cmp = [{"a": "cometkiwi22", "b": "metricx24_qe", "diff": -0.022, "lo": -0.034, "hi": -0.012, "p": 0.0}]
+    choice = analysis.choose_rewards(res, cmp, {}, list(res))
+    assert choice["r_train"] == "metricx24_qe"
+    assert "by 2.2 points (95% CI [1.2, 3.4])" in choice["notes"][0]

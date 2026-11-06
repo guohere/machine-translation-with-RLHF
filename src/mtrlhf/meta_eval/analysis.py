@@ -21,7 +21,7 @@ SHIPPED_EQUIVALENTS = {
     "cometkiwi22": [("CometKiwi-src", True), ("COMETKiwi-src", False)],
     "comet22": [("COMET-{ref}", True), ("COMET-22-{ref}", {"wmt24"})],
     "chrf": [("chrF-{ref}", True)],
-    "bleu": [("BLEU-{ref}", False)],
+    "bleu": [("BLEU-{ref}", True)],
     "metricx24_qe": [("MetricX-24-Hybrid-QE-src", False)],
     "metricx24_ref": [("MetricX-24-Hybrid-{ref}", False)],
 }
@@ -299,8 +299,13 @@ def choose_rewards(results: dict, comparisons: list[dict], metas: dict, names: l
                 f"(p = {cmp['p']:.2f}); choosing the faster one ({faster}).")
             r_train = faster
         elif cmp:
-            out["notes"].append(f"{r_train} beats {runner} on within-source accuracy "
-                                f"(diff {cmp['diff']:+.3f}, 95% CI [{cmp['lo']:+.3f}, {cmp['hi']:+.3f}]).")
+            # comparisons store a - b; report the winner's margin as a positive number
+            if cmp["a"] == r_train:
+                d, lo, hi = cmp["diff"], cmp["lo"], cmp["hi"]
+            else:
+                d, lo, hi = -cmp["diff"], -cmp["hi"], -cmp["lo"]
+            out["notes"].append(f"{r_train} beats {runner} on within-source accuracy by {100 * d:.1f} points "
+                                f"(95% CI [{100 * lo:.1f}, {100 * hi:.1f}]).")
     out["r_train"] = r_train
     fam = info(r_train)["family"]
     evals = sorted([n for n in names if n in REGISTRY and info(n)["needs_reference"]

@@ -2,7 +2,7 @@
 
 **Validate the reward, optimize it, and find where it breaks.** This is a controlled study of reward-guided fine-tuning for English→German machine translation, extended to cascaded speech translation.
 
-> **Status: 🚧 Phase 1 code ready, first run pending.** The reward benchmark runs on a free Kaggle or Colab T4 via [`notebooks/p1_reward_benchmark.ipynb`](notebooks/p1_reward_benchmark.ipynb). Phases 2–4 are designed in the [project proposal](docs/proposal.md) and the [system workflow](docs/workflow.md). The benchmark tables below fill in as experiments finish.
+> **Status: Phase 1 done ✅ · Phase 2 next.** The reward benchmark ran on a Kaggle T4 ([full report](results/p1/report/summary.md)). It chose **MetricX-24-QE** as the training reward and **COMET-22** as the held-out evaluator. Phases 2–4 are designed in the [project proposal](docs/proposal.md) and the [system workflow](docs/workflow.md).
 
 ---
 
@@ -56,15 +56,25 @@ Best-of-N picks the top candidate for a sentence. DPO learns from a better/worse
 
 *Results are filled in as experiments complete.*
 
-**A · Reward models vs. expert judgements** (en→de MQM: WMT22 + WMT23 pooled, WMT24 separately)
+**A · Reward models vs. expert judgements** ✅ ([full report](results/p1/report/summary.md))
 
-| Reward | Needs reference | Within-source acc. ↑ | Within-source acc. on WMT24 ↑ | Segment Kendall τ ↑ | System pairwise acc. ↑ | Probe detection ↑ | Throughput |
-|---|---|---|---|---|---|---|---|
-| CometKiwi-22 | no | – | – | – | – | – | – |
-| MetricX-24 (QE) | no | – | – | – | – | – | – |
-| COMET-22 | yes | – | – | – | – | – | – |
-| MetricX-24 (ref) | yes | – | – | – | – | – | – |
-| chrF | yes | – | – | – | – | – | – |
+38,936 expert-rated (MQM) English→German translations: WMT22 and WMT23 (sentence-level, pooled; they decide the choice) and WMT24 (newer, LLM-era systems, paragraph-level; reported separately). *Within-source accuracy* is the share of same-source translation pairs where the reward agrees with the experts on which one is better (50% = chance). Brackets are 95% bootstrap CIs.
+
+| Reward | Needs reference | Within-source acc. (WMT22+23) ↑ | WMT24 ↑ | Kendall τ_b (WMT22 / 23) ↑ | Weakest blind-spot probe (detection) | Speed on T4 (inputs/s) |
+|---|---|---|---|---|---|---|
+| MetricX-24 (ref) | yes | 68% [67, 69] | 65% | 0.42 / 0.36 | wrong language 96% | 28 |
+| COMET-22 · **R_eval** | yes | 66% [65, 67] | 67% | 0.34 / 0.34 | number 89% | 36 |
+| MetricX-24 (QE) · **R_train** | no | 64% [63, 65] | 61% | 0.38 / 0.30 | number 84% | 44 |
+| CometKiwi-22 | no | 62% [61, 62] | 59% | 0.23 / 0.29 | **wrong language 28%** | 58 |
+| chrF | yes | 60% [59, 61] | 59% | 0.21 / 0.16 | repetition 84% | 2,399 |
+| BLEU | yes | 60% [59, 61] | 58% | 0.17 / 0.15 | negation 77% | 6,744 |
+
+What Phase 1 found:
+- **MetricX-24-QE is the best affordable training reward.** It beats CometKiwi-22, a widely used QE reward in RL-for-MT work, by 2.2 points within-source (95% CI [1.2, 3.4]). The lead holds on WMT24 (61% vs. 59%).
+- **CometKiwi-22 prefers a correct translation into the *wrong language* over the German one 72% of the time** (detection 28%, CI [24, 32]). A policy trained on it would get no penalty for drifting off-target, which makes it a predicted exploit to test in Phase 3.
+- **Number errors are cheap for MetricX-24-QE.** It catches a changed number 84% of the time (CI [76, 91], n = 82) and lowers the score by only 0.3 SD. This is the main blind spot to watch, and to guard against with a number-mismatch penalty, once GRPO trains on it.
+- **Even the best rewards agree with experts on only about 2 of 3 same-source pairs.** Many reward-labelled preference pairs will therefore be wrong, especially when the two scores are close. This motivates the score-margin filter for DPO pairs and the held-out evaluation.
+- **Sanity checks pass.** Our CometKiwi-22 and COMET-22 scores reproduce the scores stored with WMT24 (Pearson 0.999 and 1.000), chrF and BLEU match exactly, and the tie-calibrated accuracy matches mt-metrics-eval's implementation to 1e-13. Larger models whose scores ship with WMT24 do better as QE rewards (the official MetricX-24-QE submission 66%, XCOMET-QE 65%), but they are too big to train with on one GPU.
 
 **B · Alignment methods** (FLORES-200 devtest, en→de)
 
@@ -163,7 +173,7 @@ python scripts/p4_cascade_eval.py --systems all
 ## Roadmap
 
 - [x] **M1a** Phase 1 code: reward interface (CometKiwi, COMET-22, MetricX-24, chrF, BLEU), mt-metrics-eval loader, agreement statistics, blind-spot probes, Kaggle/Colab notebook, tests
-- [ ] **M1b** Phase 1 run on a T4 → reward benchmark (A) and blind-spot profile → choose R_train / R_eval
+- [x] **M1b** Phase 1 run on a Kaggle T4 → reward benchmark (A) and blind-spot profile → R_train = MetricX-24-QE, R_eval = COMET-22
 - [ ] **M2** Data pipeline, SFT, evaluation harness, anchors, best-of-N curve
 - [ ] **M3** Sampling and scoring, RSFT, DPO ← *minimum viable project*
 - [ ] **M4** GRPO, KL sweep, guarded GRPO, over-optimization curves → benchmark B
