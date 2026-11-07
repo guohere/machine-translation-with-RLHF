@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-LANG_NAMES = {"en": "English", "de": "German", "zh": "Chinese"}
+LANG_NAMES = {"en": "English", "de": "German", "zh": "Chinese", "fr": "French"}
 
 _QUOTES_OPEN = "\"“„'«»"
 _QUOTES_CLOSE = "\"”“'»«"

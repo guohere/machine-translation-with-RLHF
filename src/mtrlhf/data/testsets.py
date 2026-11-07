@@ -16,16 +16,17 @@ import urllib.request
 
 FLORES_URL = "https://dl.fbaipublicfiles.com/nllb/flores200_dataset.tar.gz"
 FLORES_CODES = {"en": "eng_Latn", "de": "deu_Latn", "zh": "zho_Hans"}
+FLORES_EXTRA_CODES = {"fr": "fra_Latn"}  # used by diagnostics only
 FLORES_SETS = [("dev", "en", "de"), ("devtest", "en", "de"), ("devtest", "de", "en"), ("devtest", "en", "zh")]
 
 
-def _flores_from_tarball(dest_dir: str) -> dict[tuple[str, str], list[str]]:
+def _flores_from_tarball(dest_dir: str, codes: dict[str, str] | None = None) -> dict[tuple[str, str], list[str]]:
     os.makedirs(dest_dir, exist_ok=True)
     path = os.path.join(dest_dir, "flores200_dataset.tar.gz")
     if not os.path.exists(path):
         urllib.request.urlretrieve(FLORES_URL, path)
     wanted = {f"{split}/{code}.{split}": (split, lang)
-              for split in ("dev", "devtest") for lang, code in FLORES_CODES.items()}
+              for split in ("dev", "devtest") for lang, code in (codes or FLORES_CODES).items()}
     out = {}
     with tarfile.open(path, "r:gz") as tar:
         for member in tar:
@@ -37,24 +38,26 @@ def _flores_from_tarball(dest_dir: str) -> dict[tuple[str, str], list[str]]:
     return out
 
 
-def _flores_from_hub() -> dict[tuple[str, str], list[str]]:
+def _flores_from_hub(codes: dict[str, str] | None = None) -> dict[tuple[str, str], list[str]]:
     """Fallback: the gated openlanguagedata/flores_plus dataset (needs HF_TOKEN and accepted terms)."""
     from datasets import load_dataset
 
     out = {}
-    for lang, code in FLORES_CODES.items():
+    for lang, code in (codes or FLORES_CODES).items():
         for split in ("dev", "devtest"):
             ds = load_dataset("openlanguagedata/flores_plus", code, split=split)
             out[(split, lang)] = list(ds["text"])
     return out
 
 
-def load_flores(dest_dir: str) -> dict[tuple[str, str], list[str]]:
+def load_flores(dest_dir: str, langs: list[str] | None = None) -> dict[tuple[str, str], list[str]]:
+    """{(split, lang): sentences}; langs defaults to en, de, zh (any of FLORES_EXTRA_CODES also works)."""
+    codes = {lang: {**FLORES_CODES, **FLORES_EXTRA_CODES}[lang] for lang in langs} if langs else None
     try:
-        return _flores_from_tarball(dest_dir)
+        return _flores_from_tarball(dest_dir, codes)
     except Exception as e:
         print(f"FLORES tarball failed ({e}); trying openlanguagedata/flores_plus on the Hub")
-        return _flores_from_hub()
+        return _flores_from_hub(codes)
 
 
 def flores_sets(dest_dir: str) -> dict[str, list[dict]]:

@@ -196,16 +196,23 @@ def model_section(model: str, outputs: dict, logs: dict, detection: dict, out_di
             if rows:
                 h = ev.scores(rows, ev.HELD_OUT)
                 rates = ev.exploit_rates(rows)
+                exact = 100 * ev.mean([r["hyp"].strip() == r["src"].strip() for r in rows])
                 fr.append({"testset": ts, "system": system, ev.HELD_OUT: ev.mean(h) if h else float("nan"),
-                           **ev.corpus_scores(rows), "wrong_language": rates["wrong_language"], "copy": rates["copy"]})
+                           **ev.corpus_scores(rows), "wrong_language": rates["wrong_language"], "copy": rates["copy"],
+                           "exact_copy": exact})
     data["forgetting"] = fr
     if fr:
         md += ["### F · Forgetting on untrained directions", "",
-               "Training was English→German only. *Wrong language* = the output is not in the target language "
-               "(for German→English, typically German); *copy* = the output mostly repeats the source.", ""]
-        md += [table(["Test set", "System", "COMET-22", "chrF", "BLEU", "Wrong language %", "Copy %"],
+               "Training was English→German only. *Wrong language* = the output is not in the target language; "
+               "*near copy* = most character 4-grams of the output occur in the source (includes rewrites of the "
+               "source in its own language); *exact copy* = the output is the source, verbatim.", ""]
+        md += [table(["Test set", "System", "COMET-22", "chrF", "BLEU", "Wrong language %", "Near copy %",
+                      "Exact copy %"],
                      [[r["testset"], ev.name(r["system"]), f(r[ev.HELD_OUT]), f(r["chrf"], 1), f(r["bleu"], 1),
-                       f(r["wrong_language"], 1), f(r["copy"], 1)] for r in fr]), ""]
+                       f(r["wrong_language"], 1), f(r["copy"], 1), f(r["exact_copy"], 1)] for r in fr]), ""]
+        if os.path.exists(os.path.join(os.path.dirname(out_dir.rstrip("/")), "p2", model, "diagnostics",
+                                       "direction.md")):
+            md += [f"Why: see the direction diagnostic in `results/p2/{model}/diagnostics/direction.md`.", ""]
 
     # G · human check (scripts/p3_human_eval.py)
     human = os.path.join(human_dir, model, "summary.md")

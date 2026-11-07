@@ -127,3 +127,17 @@ def test_phase2_end_to_end(setup):
     bo = read_jsonl(os.path.join(outs, "sft+bo3", "flores_devtest.en-de.jsonl"))
     assert len(bo[0]["candidates"]) == 3
     assert bo[0]["hyp"] == max(bo[0]["candidates"], key=lambda c: c["score"])["hyp"]
+
+
+def test_direction_diagnostic(setup):
+    """Runs after the end-to-end test (needs its sft adapter): adapter off, scaled and on."""
+    s = setup
+    texts = s["tmp"] / "texts.json"
+    json.dump({"en": SRC[:3], "de": REF_A[:3], "fr": SRC[:3], "zh": REF_A[:3]}, open(texts, "w"))
+    out = s["tmp"] / "diag"
+    log = run("scripts/p2_diagnose_direction.py", "--ckpt", s["ckpt"], "--base-model", s["base"], "--texts",
+              str(texts), "--n", "3", "--max-new-tokens", "8", "--out", str(out))
+    res = json.load(open(out / "direction.json"))["results"]
+    assert [r["scale"] for r in res[:5]] == [None, 0.25, 0.5, 0.75, 1.0] and len(res) == 12
+    assert all(r["n"] == 3 and 0 <= r["target_lang_pct"] <= 100 for r in res)
+    assert "| de→en, adapter off |" in open(out / "direction.md").read() and "chrF" in log

@@ -30,15 +30,15 @@ Share of outputs with each signal (%). *short* / *long* = under 70% / over 140% 
 
 ### F · Forgetting on untrained directions
 
-Training was English→German only. *Wrong language* = the output is not in the target language (for German→English, typically German); *copy* = the output mostly repeats the source.
+Training was English→German only. *Wrong language* = the output is not in the target language; *near copy* = most character 4-grams of the output occur in the source (includes rewrites of the source in its own language); *exact copy* = the output is the source, verbatim.
 
-| Test set | System | COMET-22 | chrF | BLEU | Wrong language % | Copy % |
-|---|---|---|---|---|---|---|
-| flores_devtest.de-en | base | – | 64.0 | 37.2 | 0.3 | 0.3 |
-| flores_devtest.de-en | sft | – | 25.1 | 2.6 | 98.9 | 96.7 |
-| flores_devtest.de-en | rsft | – | 24.9 | 2.4 | 99.3 | 96.7 |
-| flores_devtest.de-en | dpo | – | 24.7 | 2.3 | 100.0 | 94.6 |
-| flores_devtest.en-zh | base | – | 33.2 | 38.5 | 0.2 | 0.1 |
-| flores_devtest.en-zh | sft | – | 31.9 | 36.0 | 3.8 | 2.2 |
-| flores_devtest.en-zh | rsft | – | 32.4 | 36.4 | 3.3 | 1.6 |
-| flores_devtest.en-zh | dpo | – | 34.0 | 38.3 | 0.7 | 0.1 |
+| Test set | System | COMET-22 | chrF | BLEU | Wrong language % | Near copy % | Exact copy % |
+|---|---|---|---|---|---|---|---|
+| flores_devtest.de-en | base | – | 64.0 | 37.2 | 0.3 | 0.3 | 0.0 |
+| flores_devtest.de-en | sft | – | 25.1 | 2.6 | 98.9 | 96.7 | 41.5 |
+| flores_devtest.de-en | rsft | – | 24.9 | 2.4 | 99.3 | 96.7 | 35.3 |
+| flores_devtest.de-en | dpo | – | 24.7 | 2.3 | 100.0 | 94.6 | 13.1 |
+| flores_devtest.en-zh | base | – | 33.2 | 38.5 | 0.2 | 0.1 | 0.0 |
+| flores_devtest.en-zh | sft | – | 31.9 | 36.0 | 3.8 | 2.2 | 1.2 |
+| flores_devtest.en-zh | rsft | – | 32.4 | 36.4 | 3.3 | 1.6 | 0.9 |
+| flores_devtest.en-zh | dpo | – | 34.0 | 38.3 | 0.7 | 0.1 | 0.0 |

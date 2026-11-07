@@ -56,6 +56,7 @@ def part_a_done(cwd, model="qwen3-1.7b", rsft_sampling=None):
     outputs(cwd, model, "opus-mt", [s for s in SETS if s.endswith(".en-de")])  # OPUS-MT is en-de only
     outputs(cwd, model, "sft+bo8", ["flores_devtest.en-de", "wmt24.en-de", "flores_dev.en-de"])
     write(f"{cwd}/results/p2/{model}/outputs/sft+bo8/_sampling.json", {**SAMPLING, "reranker": "metricx24_qe"})
+    write(f"{cwd}/results/p2/{model}/diagnostics/direction.json", {"results": []})
 
 
 def part_b_done(cwd, model="qwen3-1.7b"):
@@ -68,8 +69,8 @@ def test_fresh_start_runs_part_a_only(tmp_path):
     steps, out = dry_run(tmp_path)
     assert "model qwen3-1.7b" in out
     assert steps == ["prepare_data", "smoke_sft", "smoke_sample", "smoke_grpo", "smoke_translate", "sft",
-                     "sampling_pilot", "sample", "pairs", "rsft", "dpo", "translate_A", "translate_bo8", "quick_eval",
-                     "p3_score", "p3_analyze"]
+                     "sampling_pilot", "sample", "pairs", "rsft", "dpo", "translate_A", "translate_bo8",
+                     "diagnose_direction", "quick_eval", "p3_score", "p3_analyze"]
     assert "Part B (GRPO) starts in the next run" in out
 
 
@@ -78,6 +79,17 @@ def test_part_b_runs_once_part_a_has_nothing_left(tmp_path):
     steps, out = dry_run(tmp_path)
     assert steps == ["grpo", "grpo_guarded", "quick_eval", "p3_score", "p3_analyze"] and "Part A complete." in out
     assert "sampling for every method and model: temperature 0.8, top-p 1.0" in out
+
+
+def test_next_kaggle_run_diagnoses_before_grpo(tmp_path):
+    """Part A finished before the diagnostic existed: the next run only diagnoses; GRPO waits a run."""
+    part_a_done(tmp_path)
+    os.remove(tmp_path / "results/p2/qwen3-1.7b/diagnostics/direction.json")
+    steps, out = dry_run(tmp_path)
+    assert steps == ["diagnose_direction", "quick_eval", "p3_score", "p3_analyze"]
+    assert "Part B (GRPO) starts in the next run" in out
+    steps, _ = dry_run(tmp_path, "diagnose_direction=false")
+    assert steps[:2] == ["grpo", "grpo_guarded"]
 
 
 def test_outdated_rsft_is_retrained_and_retranslated(tmp_path):
@@ -96,8 +108,8 @@ def test_current_kaggle_state_resamples_and_retrains(tmp_path):
         adapter(tmp_path, "qwen3-1.7b", name)
     outputs(tmp_path, "qwen3-1.7b", "base")
     steps, out = dry_run(tmp_path)
-    assert steps == ["sampling_pilot", "sample", "pairs", "rsft", "dpo", "translate_A", "translate_bo8", "quick_eval",
-                     "p3_score", "p3_analyze"]
+    assert steps == ["sampling_pilot", "sample", "pairs", "rsft", "dpo", "translate_A", "translate_bo8",
+                     "diagnose_direction", "quick_eval", "p3_score", "p3_analyze"]
     assert "sampling: chosen by the pilot in this run" in out
     assert "--systems opus-mt sft rsft dpo " in out  # base is complete already
 

@@ -131,6 +131,11 @@ def part_a(r, plan: dict) -> None:
             r.sh(f"python scripts/p2_translate.py --model {m} --systems sft --best-of 8 --testsets {' '.join(bo_sets)}",
                  "translate_bo8")
             r.save(f"Phase 2 ({m}): translations (sft + best-of-8)")
+    # Why does SFT answer de->en in German? Bug or learned behaviour (a few minutes, once per model).
+    if "sft" in systems and plan.get("diagnose_direction", True) and \
+            not os.path.exists(os.path.join(r.res, "diagnostics", "direction.json")):
+        r.sh(f"python scripts/p2_diagnose_direction.py --model {m}", "diagnose_direction")
+        r.save(f"Phase 2 ({m}): direction diagnostic")
 
 
 def part_b(r, plan: dict) -> None:

@@ -10,6 +10,7 @@ part: auto            # auto = finish Part A; Part B starts in a run where Part 
 smoke_test: auto      # auto = only for a model without a trained sft adapter (its first run); or true | false
 hub_repo: auto        # private Hugging Face repo for adapters (needs a write HF_TOKEN); none = session only
 grpo_cometkiwi: false # optional extra run: does GRPO on CometKiwi drift into the wrong language?
+diagnose_direction: true  # end of Part A: why SFT answers de->en in German (bug vs. learned), ~15 min
 budget_step: 625      # GRPO step that matches the shared budget (5,000 prompts x 8 samples)
 n_samples: 8
 train_reward: metricx24_qe
