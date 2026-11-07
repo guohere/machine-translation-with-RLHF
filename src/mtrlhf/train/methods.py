@@ -238,6 +238,9 @@ def build_config(path: str, model: str | None = None, debug: bool = False, sets:
 
 
 def run(cfg: dict, store: CheckpointStore) -> str:
+    from mtrlhf.compat import ignore_incompatible_torchao
+
+    ignore_incompatible_torchao()
     full = {**DEFAULTS, **cfg, "lora": {**DEFAULTS["lora"], **(cfg.get("lora") or {})}}
     print("config:", json.dumps({k: v for k, v in full.items() if k != "lora"}, default=str))
     return METHODS[full["method"]](full, store)

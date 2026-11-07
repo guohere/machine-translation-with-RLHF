@@ -254,6 +254,10 @@ def load_causal(name: str, store: CheckpointStore | None = None, base_model: str
     dtype = dtype or pick_dtype(device, base_model)
     tok = load_tokenizer(base_model)
     model = AutoModelForCausalLM.from_pretrained(base_model, dtype=dtype)
+    if chain:
+        from mtrlhf.compat import ignore_incompatible_torchao
+
+        ignore_incompatible_torchao()
     for adapter in chain:
         from peft import PeftModel
 

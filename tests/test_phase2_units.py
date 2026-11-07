@@ -190,3 +190,32 @@ def test_store_uses_a_per_model_folder_in_the_hub_repo(tmp_path, monkeypatch):
     store.save("sft", store.path("sft"), "google/gemma-3-1b-it", None)
     assert uploads == [("me/adapters", "gemma3-1b/sft")]
     assert store.ensure("dpo") == store.path("dpo") and store.meta("dpo")["base_model"] == "x"
+
+
+def test_incompatible_torchao_is_ignored(monkeypatch):
+    peft_import_utils = pytest.importorskip("peft.import_utils")
+    import peft.tuners.lora.torchao as lora_torchao
+
+    from mtrlhf.compat import ignore_incompatible_torchao
+
+    def kaggle_check():
+        raise ImportError("Found an incompatible version of torchao. Found version 0.10.0, "
+                          "but only versions above 0.16.0 are supported")
+
+    monkeypatch.setattr(peft_import_utils, "is_torchao_available", kaggle_check)
+    monkeypatch.setattr(lora_torchao, "is_torchao_available", kaggle_check)
+    assert ignore_incompatible_torchao() is True
+    assert peft_import_utils.is_torchao_available() is False and lora_torchao.is_torchao_available() is False
+    assert ignore_incompatible_torchao() is False  # nothing left to patch
+
+
+def test_other_import_errors_are_not_hidden(monkeypatch):
+    peft_import_utils = pytest.importorskip("peft.import_utils")
+    from mtrlhf.compat import ignore_incompatible_torchao
+
+    def broken():
+        raise ImportError("something else is broken")
+
+    monkeypatch.setattr(peft_import_utils, "is_torchao_available", broken)
+    with pytest.raises(ImportError, match="something else"):
+        ignore_incompatible_torchao()
