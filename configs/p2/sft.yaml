@@ -1,0 +1,13 @@
+# S0: supervised fine-tuning on ~20k News Commentary en-de pairs (loss on the translation only).
+# Every other method starts from this adapter.
+name: sft
+method: sft
+parent: base
+base_model: Qwen/Qwen2.5-1.5B-Instruct
+data: data/p2/sft_train.jsonl
+epochs: 1
+learning_rate: 2.0e-4
+batch_size: 16
+grad_accum: 2
+max_length: 384
+lora: {r: 16, alpha: 32, dropout: 0.05}

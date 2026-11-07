@@ -1,0 +1,22 @@
+# Online GRPO against R_train = MetricX-24-QE (chosen in Phase 1).
+# 8 prompts x 8 samples per step: 625 steps = 5k prompts = 40k reward calls, the budget
+# shared with RSFT/DPO. Training continues to 2 epochs only to trace the over-optimization
+# curve; adapters are exported every 125 steps as grpo-step<k>.
+# Guards are logged but not applied (weight 0): this is the unprotected run.
+name: grpo
+method: grpo
+parent: sft
+data: data/p2/prompts.jsonl
+reward: metricx24_qe
+num_generations: 8
+batch_size: 8          # completions per micro-batch (= 1 prompt x 8 samples)
+grad_accum: 8          # 8 prompts per optimizer step
+epochs: 2
+learning_rate: 1.0e-5
+lr_scheduler: constant_with_warmup
+beta: 0.02             # KL to the sft policy (sweep: 0.0 / 0.02 / 0.05)
+temperature: 1.0
+max_completion_length: 160
+save_steps: 125
+sample_log_every: 25
+guard_weights: {wrong_language: 0, number_mismatch: 0, length_ratio: 0, copy: 0}

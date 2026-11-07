@@ -8,8 +8,11 @@ dist/
 .venv/
 venv/
 
-# Experiment outputs (results worth keeping are copied to results/)
-runs/
-data/
-ckpt/
-wandb/
+# Experiment outputs, anchored to the repo root (src/mtrlhf/data/ is code!).
+# Results worth keeping are copied to results/.
+/runs/
+/data/
+/ckpt/
+/ckpt_debug/
+/wandb/
+/*.log

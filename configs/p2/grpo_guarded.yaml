@@ -1,0 +1,19 @@
+# Same as grpo.yaml, but the guards are penalties: each violation costs 5 MetricX error points
+# (MetricX scores run from 0 to 25). Targets the blind spots Phase 1 found.
+name: grpo_guarded
+method: grpo
+parent: sft
+data: data/p2/prompts.jsonl
+reward: metricx24_qe
+num_generations: 8
+batch_size: 8
+grad_accum: 8
+epochs: 2
+learning_rate: 1.0e-5
+lr_scheduler: constant_with_warmup
+beta: 0.02
+temperature: 1.0
+max_completion_length: 160
+save_steps: 125
+sample_log_every: 25
+guard_weights: {wrong_language: 5.0, number_mismatch: 5.0, length_ratio: 5.0, copy: 5.0}

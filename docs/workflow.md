@@ -176,7 +176,7 @@ Decision rule, written down before seeing any Phase 2 results:
 
 ### 5.1 SFT (shared starting point)
 
-- **Data:** about 30k en→de pairs, filtered with heuristics only: language ID, length ratio, deduplication, and a maximum of about 128 tokens. Without QE filtering, the baseline isn't already tuned towards R_train or R_eval.
+- **Data:** 20k en→de pairs from News Commentary (news domain, like WMT), filtered with heuristics only: language ID, length ratio, 5–60 words, deduplication, and removal of anything that occurs in a test set. Without QE filtering, the baseline isn't already tuned towards R_train or R_eval. The 5,000 RL prompts are English sentences from the same corpus, disjoint from the SFT pairs.
 - **Training:** TRL `SFTTrainer`, LoRA on all linear layers, loss on target tokens only, 1–2 epochs.
 - **After training:** merge the LoRA adapter into the base weights. The merged model is **S0**, both the starting point and the frozen reference policy for every method below.
 
@@ -228,7 +228,8 @@ $$A_i = \frac{r_i - \operatorname{mean}(r_1,\dots,r_G)}{\operatorname{std}(r_1,\
   Translations better than their siblings are reinforced and worse ones are suppressed. No value network is needed, which saves memory on one GPU.
 - A **KL penalty** (coefficient β) keeps the policy close to S0. β is set explicitly and swept (e.g. 0, 0.01, 0.05) rather than left at a library default.
 - **Single-GPU setup:** TRL `GRPOTrainer` with vLLM generation in colocate mode. The policy is 1.5B with LoRA; R_train runs in fp16 on the same card. Max completion length is about 128 tokens, G = 8 (4 if memory is tight), and gradient checkpointing is on.
-- **Budget:** the matched-budget checkpoint is taken at 40k sampled translations. Training continues further *only* to trace the over-optimization curve. The deployed checkpoint is chosen by R_eval on FLORES dev, never by R_train.
+- **Budget:** the matched-budget checkpoint is taken at 40k sampled translations: step 625, with 8 prompts × 8 samples per step. Training continues to step 1250 *only* to trace the over-optimization curve, and adapters are exported every 125 steps. Any other checkpoint choice is made by R_eval on FLORES dev, never by R_train.
+- **Guards in both runs:** the four checks (wrong language, number mismatch, length ratio, copy) are reward functions in both GRPO runs. Plain GRPO gives them weight 0, so their rates are only logged. Guarded GRPO charges 5 MetricX points per violation. A sample of completions with scores and flags is written every 25 steps for the Phase 3 audit.
 
 ### 5.7 Guards (hacking mitigation, system A5)
 
@@ -361,10 +362,11 @@ Evaluate S0 and every aligned system on FLORES devtest **de→en** (the reverse 
 | 1a | `python scripts/p1_build_inputs.py --run runs/p1 --download` | `segments.jsonl` (rated translations), `probes.jsonl` |
 | 1b | `python scripts/p1_score.py --run runs/p1 --rewards chrf bleu cometkiwi22 comet22 metricx24_qe metricx24_ref` | `scores/<reward>.jsonl` and timing |
 | 1c | `python scripts/p1_analyze.py --run runs/p1` | `report/summary.md`, `reward_benchmark.csv`, `blind_spots.csv/.png` |
-| 2a | `python scripts/p2_prepare_data.py` | `data/sft.jsonl`, `data/prompts.jsonl` |
-| 2b | `python scripts/p2_train.py --config configs/sft.yaml` | `ckpt/sft` (S0) |
-| 2c | `python scripts/p2_sample_and_score.py --policy ckpt/sft --n 8 --reward R_train` | `data/candidates.scored.jsonl` |
-| 2d | `python scripts/p2_train.py --config configs/{rsft,dpo,grpo,grpo_guarded}.yaml` | `ckpt/{rsft,dpo,grpo,grpo_guarded}` |
+| 2a | `python scripts/p2_prepare_data.py --out data/p2` | `sft_train.jsonl`, `prompts.jsonl`, `testsets/*.jsonl` |
+| 2b | `python scripts/p2_train.py --config configs/p2/sft.yaml` | `ckpt/sft` (S0) |
+| 2c | `python scripts/p2_sample.py --system sft --n 8 --reward metricx24_qe`, then `python scripts/p2_build_pairs.py` | `candidates.jsonl`, `rsft.jsonl`, `dpo_pairs.jsonl` |
+| 2d | `python scripts/p2_train.py --config configs/p2/{rsft,dpo,grpo,grpo_guarded}.yaml` | `ckpt/{rsft,dpo,grpo,grpo_guarded}`, `ckpt/grpo-step<k>` |
+| 2e | `python scripts/p2_translate.py --systems … [--best-of 8]` | `results/p2/outputs/<system>/<testset>.jsonl`, `quick_eval.md` |
 | 3a | `python scripts/p3_evaluate.py --systems all --testsets flores_devtest wmt24` | `reports/p3/method_benchmark.csv` |
 | 3b | `python scripts/p3_hacking_report.py` | `reports/p3/exploits.md`, over-optimization plots |
 | 4a | `python scripts/p4_transcribe.py --whisper tiny base small medium large-v3-turbo --testsets fleurs_en mustc_tst_common` | `data/asr/*.jsonl`, WER table |

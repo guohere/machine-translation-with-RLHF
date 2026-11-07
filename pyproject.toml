@@ -38,6 +38,17 @@ phase1 = [
     "absl-py",
     "dacite",
 ]
+# Phase 2 (training). Same environment as phase1 (transformers 4.x), so the COMET
+# evaluator still works next to the trainers.
+phase2 = [
+    "trl==1.17.1",
+    "peft==0.21.2",
+    "datasets>=4.7",
+    "accelerate>=1.11",
+    "huggingface-hub<1.0",
+    "langid",
+    "pyyaml",
+]
 dev = ["pytest"]
 
 [tool.setuptools.packages.find]

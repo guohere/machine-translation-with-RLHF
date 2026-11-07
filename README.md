@@ -2,7 +2,7 @@
 
 **Validate the reward, optimize it, and find where it breaks.** This is a controlled study of reward-guided fine-tuning for English→German machine translation, extended to cascaded speech translation.
 
-> **Status: Phase 1 done ✅ · Phase 2 next.** The reward benchmark ran on a Kaggle T4 ([full report](results/p1/report/summary.md)). It chose **MetricX-24-QE** as the training reward and **COMET-22** as the held-out evaluator. Phases 2–4 are designed in the [project proposal](docs/proposal.md) and the [system workflow](docs/workflow.md).
+> **Status: Phase 1 done ✅ · Phase 2 code ready, first run pending.** The reward benchmark ran on a Kaggle T4 ([full report](results/p1/report/summary.md)). It chose **MetricX-24-QE** as the training reward and **COMET-22** as the held-out evaluator. Phase 2 (SFT, best-of-N, RSFT, DPO, GRPO) runs on Kaggle via [`notebooks/p2_training.ipynb`](notebooks/p2_training.ipynb). Phases 3–4 are designed in the [project proposal](docs/proposal.md) and the [system workflow](docs/workflow.md).
 
 ---
 
@@ -114,18 +114,22 @@ A worked example that follows one sentence through the whole system is in [workf
 
 ```
 machine-translation-with-RLHF/
+├── configs/p2/         # one YAML per Phase 2 system: sft, rsft, dpo, grpo, grpo_guarded, grpo_cometkiwi
 ├── docs/               # proposal.md, workflow.md
-├── notebooks/          # p1_reward_benchmark.ipynb: runs Phase 1 on a Kaggle/Colab T4
-├── scripts/            # one CLI per pipeline step: p1_build_inputs, p1_score, p1_analyze
+├── notebooks/          # p1_reward_benchmark.ipynb, p2_training.ipynb (Kaggle / Colab)
+├── scripts/            # one CLI per pipeline step: p1_* (reward benchmark), p2_* (training, translation)
 ├── src/mtrlhf/
 │   ├── rewards/        # one interface: score(src, hyp, ref=None) → higher is better
-│   │                   #   CometKiwi / COMET-22 (comet.py), MetricX-24 (metricx.py), chrF / BLEU
-│   └── meta_eval/      # mt-metrics-eval loader, agreement statistics, blind-spot probes, report
-├── tests/              # unit tests + an end-to-end run on a small fake WMT dataset
+│   │                   #   CometKiwi / COMET-22, MetricX-24, chrF / BLEU; guards.py = rule-based exploit checks
+│   ├── meta_eval/      # mt-metrics-eval loader, agreement statistics, blind-spot probes, report
+│   ├── data/           # prompt template, News Commentary training data, FLORES-200 / WMT24 test sets
+│   ├── train/          # SFT / RSFT, DPO, GRPO on TRL + LoRA; GRPO reward functions
+│   └── models.py       # systems as LoRA adapter chains, Hub-mirrored checkpoint store, batched generation
+├── tests/              # unit tests + end-to-end runs of Phase 1 and Phase 2 on tiny fake data (CPU)
 └── results/            # finished results, one folder per phase
 ```
 
-Planned for later phases: `configs/`, `src/mtrlhf/{data,decode,train,eval,speech}/` and `human_eval/` (see [workflow](docs/workflow.md)).
+Planned for later phases: Phase 3 analysis scripts, `src/mtrlhf/speech/` and `human_eval/` (see [workflow](docs/workflow.md)).
 
 ## Running Phase 1
 
@@ -148,15 +152,34 @@ python scripts/p1_analyze.py --run runs/p1                     # report in runs/
 pytest   # unit tests and an end-to-end run on a small fake dataset (no GPU, no downloads)
 ```
 
-## Later phases (target interface)
+## Running Phase 2
+
+**On Kaggle (recommended).** Open [`notebooks/p2_training.ipynb`](notebooks/p2_training.ipynb) with **GPU T4 ×2**, a *write* `HF_TOKEN` (adapters are saved to a private Hugging Face repo as they finish) and `GH_TOKEN`. Run it with `PART = "A"` (data, SFT, sampling, RSFT, DPO; ~4–5 h), then `PART = "B"` (GRPO and guarded GRPO side by side; ~5–6 h). These times are rough estimates. Every step skips work that is already saved.
+
+**Anywhere else:**
 
 ```bash
-# Phase 2: SFT, then alignment from the same checkpoint
-python scripts/p2_prepare_data.py
-python scripts/p2_train.py --config configs/sft.yaml
-python scripts/p2_sample_and_score.py --policy ckpt/sft --n 8 --reward cometkiwi22
-python scripts/p2_train.py --config configs/dpo.yaml   # also rsft.yaml, grpo.yaml, grpo_guarded.yaml
+pip install -e ".[phase1,phase2,dev]"
+pip install --no-deps unbabel-comet==2.2.7 "git+https://github.com/google-research/mt-metrics-eval"
 ```
+
+```bash
+python scripts/p2_prepare_data.py --out data/p2                      # News Commentary, FLORES-200, WMT24
+python scripts/p2_train.py --config configs/p2/sft.yaml                # S0: the shared starting point
+python scripts/p2_sample.py --system sft --n 8 --reward metricx24_qe   # 5k prompts x 8 samples, scored
+python scripts/p2_build_pairs.py                                       # RSFT targets, DPO pairs
+python scripts/p2_train.py --config configs/p2/rsft.yaml
+python scripts/p2_train.py --config configs/p2/dpo.yaml
+python scripts/p2_train.py --config configs/p2/grpo.yaml               # guards logged only
+python scripts/p2_train.py --config configs/p2/grpo_guarded.yaml       # guards as penalties
+python scripts/p2_translate.py --systems base opus-mt sft rsft dpo grpo-step625 grpo_guarded-step625
+python scripts/p2_translate.py --systems sft --best-of 8
+python scripts/p2_translate.py --summary-only --score chrf metricx24_qe comet22
+```
+
+Add `--debug` to `p2_train.py` for a few-minute run with the 0.5B model and a separate checkpoint folder.
+
+## Later phases (target interface)
 
 ```bash
 # Phase 3: evaluation and hacking report
@@ -174,9 +197,9 @@ python scripts/p4_cascade_eval.py --systems all
 
 - [x] **M1a** Phase 1 code: reward interface (CometKiwi, COMET-22, MetricX-24, chrF, BLEU), mt-metrics-eval loader, agreement statistics, blind-spot probes, Kaggle/Colab notebook, tests
 - [x] **M1b** Phase 1 run on a Kaggle T4 → reward benchmark (A) and blind-spot profile → R_train = MetricX-24-QE, R_eval = COMET-22
-- [ ] **M2** Data pipeline, SFT, evaluation harness, anchors, best-of-N curve
-- [ ] **M3** Sampling and scoring, RSFT, DPO ← *minimum viable project*
-- [ ] **M4** GRPO, KL sweep, guarded GRPO, over-optimization curves → benchmark B
+- [x] **M2a/M3a** Phase 2 code: data pipeline, SFT, sampling and scoring, best-of-N, RSFT, DPO, Kaggle notebook, tests
+- [ ] **M2b/M3b** Phase 2 Part A run → `sft`, `sft+bo8`, `rsft`, `dpo` ← *minimum viable project*
+- [ ] **M4** GRPO and guarded GRPO (code ready, run = Part B), KL sweep, over-optimization curves → benchmark B
 - [ ] **M5** Hacking diagnostics, predicted vs. observed exploits, human check, forgetting check
 - [ ] **M6** Whisper sweep, cascade evaluation, latency → benchmark C; final write-up
 - [ ] *Stretch:* CPO · MBR · cross-reward GRPO (2×2) · noise-aware GRPO on ASR transcripts
