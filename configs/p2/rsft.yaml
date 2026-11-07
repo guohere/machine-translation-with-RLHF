@@ -1,0 +1,10 @@
+# Rejection-sampling fine-tuning: SFT on the best of 8 samples per prompt (scored by R_train).
+name: rsft
+method: sft
+parent: sft
+data: "{model_data}/rsft.jsonl"
+epochs: 1
+learning_rate: 1.0e-4
+batch_size: 16
+grad_accum: 2
+max_length: 384

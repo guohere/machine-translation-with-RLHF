@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+build/
+dist/
+.venv/
+venv/
+
+# Experiment outputs, anchored to the repo root (src/mtrlhf/data/ is code!).
+# Results worth keeping are copied to results/.
+/runs/
+/data/
+/ckpt/
+/ckpt_debug/
+/wandb/
+/*.log

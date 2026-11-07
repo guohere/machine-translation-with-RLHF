@@ -1,0 +1,20 @@
+# Optional: GRPO trained on CometKiwi-22 instead. Phase 1 found that CometKiwi prefers a
+# translation into the wrong language 72% of the time; this run tests whether the policy
+# exploits that blind spot (watch guard_wrong_language in the training log).
+name: grpo_cometkiwi
+method: grpo
+parent: sft
+data: "{shared}/prompts.jsonl"
+reward: cometkiwi22
+num_generations: 8
+batch_size: 8
+grad_accum: 8
+epochs: 2
+learning_rate: 1.0e-5
+lr_scheduler: constant_with_warmup
+beta: 0.02
+temperature: 1.0
+max_completion_length: 160
+save_steps: 125
+sample_log_every: 25
+guard_weights: {wrong_language: 0, number_mismatch: 0, length_ratio: 0, copy: 0}

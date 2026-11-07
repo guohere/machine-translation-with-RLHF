@@ -1,0 +1,18 @@
+{
+  "reward": "cometkiwi22",
+  "kind": "comet",
+  "model_id": "Unbabel/wmt22-cometkiwi-da",
+  "needs_reference": false,
+  "family": "comet",
+  "gated": true,
+  "name": "cometkiwi22",
+  "device": "cuda",
+  "gpu": "Tesla T4",
+  "n_gpus": 2,
+  "n_rows": 42599,
+  "n_unique": 32141,
+  "load_seconds": 28.4,
+  "score_seconds": 553.2,
+  "inputs_per_second": 58.1,
+  "peak_gpu_mem_gb": 5.58
+}

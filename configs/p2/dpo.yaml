@@ -1,0 +1,11 @@
+# DPO on (best, worst) pairs from the same 8 samples, margin-filtered. Reference policy = sft.
+name: dpo
+method: dpo
+parent: sft
+data: "{model_data}/dpo_pairs.jsonl"
+beta: 0.1
+epochs: 1
+learning_rate: 2.0e-5
+batch_size: 8
+grad_accum: 4
+max_length: 384
