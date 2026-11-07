@@ -1,0 +1,65 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794042276.849839     301 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+config: {"parent": "base", "base_model": "Qwen/Qwen3-1.7B", "epochs": 1, "learning_rate": 0.0002, "batch_size": 4, "grad_accum": 1, "max_length": 384, "warmup_ratio": 0.03, "lr_scheduler": "cosine", "seed": 0, "max_steps": 4, "limit": 64, "logging_steps": 1, "gradient_checkpointing": true, "out_root": "runs/p2/qwen3-1.7b_debug", "name": "sft", "method": "sft", "data": "data/p2/sft_train.jsonl", "save_steps": 2}
+
+Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+Fetching 2 files:  50%|█████     | 1/2 [00:07<00:07,  7.78s/it]
+Fetching 2 files: 100%|██████████| 2/2 [00:07<00:00,  3.89s/it]
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:02<00:02,  2.08s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.07s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.23s/it]
+Traceback (most recent call last):
+  File "/kaggle/working/machine-translation-with-RLHF/scripts/p2_train.py", line 53, in <module>
+    main()
+    ~~~~^^
+  File "/kaggle/working/machine-translation-with-RLHF/scripts/p2_train.py", line 49, in main
+    run(cfg, store)
+    ~~~^^^^^^^^^^^^
+  File "/kaggle/working/machine-translation-with-RLHF/scripts/../src/mtrlhf/train/methods.py", line 243, in run
+    return METHODS[full["method"]](full, store)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/kaggle/working/machine-translation-with-RLHF/scripts/../src/mtrlhf/train/methods.py", line 111, in train_sft
+    trainer = SFTTrainer(model=model, args=args, train_dataset=train, processing_class=tok,
+                         peft_config=lora_config(cfg))
+  File "/usr/local/lib/python3.13/dist-packages/trl/trainer/sft_trainer.py", line 918, in __init__
+    model = get_peft_model(model, peft_config, **get_peft_model_kwargs)
+  File "/usr/local/lib/python3.13/dist-packages/peft/mapping_func.py", line 198, in get_peft_model
+    return MODEL_TYPE_TO_PEFT_MODEL_MAPPING[peft_config.task_type](
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        model,
+        ^^^^^^
+    ...<3 lines>...
+        low_cpu_mem_usage=low_cpu_mem_usage,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.13/dist-packages/peft/peft_model.py", line 2082, in __init__
+    super().__init__(model, peft_config, adapter_name, **kwargs)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/dist-packages/peft/peft_model.py", line 177, in __init__
+    self.base_model = cls(model, {adapter_name: peft_config}, adapter_name)
+                      ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/dist-packages/peft/tuners/tuners_utils.py", line 344, in __init__
+    self.inject_adapter(self.model, adapter_name, low_cpu_mem_usage=low_cpu_mem_usage, state_dict=state_dict)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/dist-packages/peft/tuners/tuners_utils.py", line 978, in inject_adapter
+    self._create_and_replace(
+    ~~~~~~~~~~~~~~~~~~~~~~~~^
+        peft_config, adapter_name, target, target_name, parent, current_key=key
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/local/lib/python3.13/dist-packages/peft/tuners/lora/model.py", line 389, in _create_and_replace
+    new_module = self._create_new_module(lora_config, adapter_name, target, device_map=device_map, **kwargs)
+  File "/usr/local/lib/python3.13/dist-packages/peft/tuners/lora/model.py", line 552, in _create_new_module
+    new_module = dispatcher(target, adapter_name, config=lora_config, **kwargs)
+  File "/usr/local/lib/python3.13/dist-packages/peft/tuners/lora/torchao.py", line 160, in dispatch_torchao
+    if not is_torchao_available():
+           ~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.13/dist-packages/peft/import_utils.py", line 162, in is_torchao_available
+    raise ImportError(
+    ...<2 lines>...
+    )
+ImportError: Found an incompatible version of torchao. Found version 0.10.0, but only versions above 0.16.0 are supported
