@@ -1,0 +1,38 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794081543.208254     223 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+
+Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+Fetching 2 files:  50%|█████     | 1/2 [00:08<00:08,  8.20s/it]
+Fetching 2 files: 100%|██████████| 2/2 [00:08<00:00,  4.10s/it]
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:02<00:02,  2.15s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.13s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.28s/it]
+You are using the default legacy behaviour of the <class 'transformers.models.t5.tokenization_t5.T5Tokenizer'>. This is expected, and simply means that the `legacy` (previous) behavior will be used so nothing changes for you. If you want to use the new behaviour, set `legacy=False`. This should only be set if you understand what it means, and thoroughly read the reason why this was added as explained in https://github.com/huggingface/transformers/pull/24565
+/usr/local/lib/python3.13/dist-packages/transformers/convert_slow_tokenizer.py:566: UserWarning: The sentencepiece tokenizer that you are converting to a fast tokenizer uses the byte fallback option which is not implemented in the fast tokenizers. In practice this means that the fast version of the tokenizer can produce unknown tokens whereas the sentencepiece version would have converted these unknown tokens into a sequence of byte tokens matching the original piece of text.
+  warnings.warn(
+(compat: PEFT rejects the installed torchao version; torchao is not used here, so it is ignored)
+T=0.6  top_p=0.95  broken   0.2%  spread  0.97  identical   0.0%  mean  -1.64  best  -0.66  (200s)
+T=0.6  top_p=1.0   broken   0.4%  spread  1.20  identical   0.0%  mean  -1.89  best  -0.68  (170s)
+T=0.8  top_p=0.95  broken   1.4%  spread  1.48  identical   0.0%  mean  -2.25  best  -0.78  (198s)
+T=0.8  top_p=1.0   broken   3.2%  spread  2.08  identical   0.0%  mean  -2.97  best  -0.90  (192s)
+T=1.0  top_p=0.95  broken  10.0%  spread  3.02  identical   0.0%  mean  -4.45  best  -1.28  (269s)
+T=1.0  top_p=1.0   broken  27.8%  spread  4.40  identical   0.0%  mean  -7.06  best  -1.92  (312s)
+
+# Sampling pilot
+
+Model `Qwen/Qwen3-1.7B` (system `sft`), 200 held-out sentences (`data/p2/sft_val.jsonl`), 8 samples each, scored with `metricx24_qe`. Broken = MetricX error > 10. Spread = mean within-group std of the reward.
+
+| Temperature | top-p | Broken % | Guard flags % | Spread | Identical groups % | Unique / group | Mean | Best-of-N |
+|---|---|---|---|---|---|---|---|---|
+| 0.6 | 0.95 | 0.2 | 0.9 | 0.97 | 0.0 | 7.8 | -1.64 | -0.66 |
+| 0.6 | 1.0 | 0.4 | 1.4 | 1.20 | 0.0 | 7.9 | -1.89 | -0.68 |
+| 0.8 | 0.95 | 1.4 | 2.1 | 1.48 | 0.0 | 7.9 | -2.25 | -0.78 |
+| 0.8 | 1.0 | 3.2 | 2.6 | 2.08 | 0.0 | 8.0 | -2.97 | -0.90 **← chosen** |
+| 1.0 | 0.95 | 10.0 | 4.9 | 3.02 | 0.0 | 8.0 | -4.45 | -1.28 |
+| 1.0 | 1.0 | 27.8 | 6.7 | 4.40 | 0.0 | 8.0 | -7.06 | -1.92 |
+
+**Chosen: temperature 0.8, top-p 1.0** — largest within-group reward spread (2.08) among the 4 settings with <= 5.0% broken samples.
+
+wrote results/p2/sampling.json

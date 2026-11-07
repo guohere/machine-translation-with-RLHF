@@ -1,0 +1,14 @@
+{
+  "temperature": 0.8,
+  "top_p": 1.0,
+  "why": "largest within-group reward spread (2.08) among the 4 settings with <= 5.0% broken samples",
+  "chosen_on": {
+    "model": "qwen3-1.7b",
+    "system": "sft",
+    "prompts": "data/p2/sft_val.jsonl",
+    "n_sentences": 200,
+    "n": 8,
+    "reward": "metricx24_qe"
+  },
+  "report": "results/p2/qwen3-1.7b/sampling_pilot/report.md"
+}
