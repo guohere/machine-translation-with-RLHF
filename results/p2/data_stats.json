@@ -1,0 +1,19 @@
+{
+  "raw": 449333,
+  "dropped_filters": 1619,
+  "dropped_duplicate": 1,
+  "dropped_test_overlap": 0,
+  "dropped_language": 50,
+  "n_sft_train": 20000,
+  "n_sft_val": 500,
+  "n_prompts": 5000,
+  "source": "news-commentary-v18.de-en.tsv.gz",
+  "seed": 13,
+  "testsets": {
+    "flores_dev.en-de": 997,
+    "flores_devtest.en-de": 1012,
+    "flores_devtest.de-en": 1012,
+    "flores_devtest.en-zh": 1012,
+    "wmt24.en-de": 998
+  }
+}
