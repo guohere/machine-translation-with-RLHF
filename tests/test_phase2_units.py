@@ -219,3 +219,58 @@ def test_other_import_errors_are_not_hidden(monkeypatch):
     monkeypatch.setattr(peft_import_utils, "is_torchao_available", broken)
     with pytest.raises(ImportError, match="something else"):
         ignore_incompatible_torchao()
+
+
+# --- sentence-level NMT on paragraphs (OPUS-MT crashed on WMT24) ------------------------
+
+def test_split_sentences():
+    from mtrlhf.models import split_sentences
+
+    para = "The first sentence is here. A second one follows! Is this the third? Yes.\nNew line."
+    assert split_sentences(para) == ["The first sentence is here.", "A second one follows!",
+                                     "Is this the third?", "Yes.", "New line."]
+    assert split_sentences("Dr. Smith arrived at 5 p.m. today.") == ["Dr. Smith arrived at 5 p.m. today."]
+
+
+def test_seq2seq_paragraphs_are_translated_sentence_by_sentence():
+    torch = pytest.importorskip("torch")
+    from mtrlhf.models import Translator
+
+    class Tok:
+        pad_token_id = 0
+        padding_side = "right"
+
+        def __init__(self):
+            self.calls = []
+
+        def __call__(self, texts, **kw):
+            self.calls.append((list(texts), kw))
+            ids = torch.ones((len(texts), 3), dtype=torch.long)
+
+            class Enc(dict):
+                def to(self, device):
+                    return self
+            return Enc(input_ids=ids, attention_mask=ids)
+
+        def batch_decode(self, ids, skip_special_tokens=True):
+            return [f"T{int(row[0])}" for row in ids]
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.w = torch.nn.Parameter(torch.zeros(1))
+            self.config = type("C", (), {"max_position_embeddings": 512})()
+            self.seen = []
+
+        def generate(self, input_ids, attention_mask, **gen):
+            self.seen.append(gen)
+            return torch.arange(input_ids.shape[0]).unsqueeze(1)  # one "token" = row index
+
+    tok, model = Tok(), Model()
+    tr = Translator(model, tok, kind="seq2seq", batch_size=8, max_new_tokens=768)
+    out = tr.generate(["One. Two. Three.", "Single sentence"])
+    assert len(out) == 2 and len(out[0][0].split()) == 3 and len(out[1][0].split()) == 1
+    texts, kw = tok.calls[0]
+    assert sorted(texts) == sorted(["One.", "Two.", "Three.", "Single sentence"])
+    assert kw["truncation"] is True and kw["max_length"] == 512
+    assert model.seen[0]["max_new_tokens"] == 511  # capped below the 512 positions

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import tempfile
 
@@ -268,6 +269,31 @@ def load_causal(name: str, store: CheckpointStore | None = None, base_model: str
 
 # --- generation ----------------------------------------------------------------------
 
+_SENTENCE_END = re.compile(r"(?<=[.!?…])\s+(?=[\"'“„«(\[]?[A-Z0-9ÄÖÜ])")
+
+
+_ABBREV = re.compile(r"(?:\b(?:Mr|Mrs|Ms|Dr|Prof|St|Jr|Sr|Gen|Gov|Sen|Rep|Rev|vs|etc|No|Inc|Ltd|Co|Corp|"
+                     r"Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|U\.S|U\.K|e\.g|i\.e)|\b[A-Z])\.$")
+
+
+def split_sentences(text: str) -> list[str]:
+    """Split a paragraph into sentences (and lines), for sentence-level MT models.
+    Does not split after common abbreviations ("Dr.", "U.S.") or initials ("J.")."""
+    parts: list[str] = []
+    for line in text.split("\n"):
+        for s in _SENTENCE_END.split(line):
+            s = s.strip()
+            if not s:
+                continue
+            if parts and _ABBREV.search(parts[-1]) and not parts[-1].endswith("\n"):
+                parts[-1] = f"{parts[-1]} {s}"
+            else:
+                parts.append(s)
+        parts.append("\n")  # line boundary marker, removed below
+    out = [p for p in parts if p != "\n"]
+    return out or [text]
+
+
 class Translator:
     """Batched HF generation for a causal chat model or a seq2seq MT model."""
 
@@ -306,12 +332,31 @@ class Translator:
 
         if n > 1 and not do_sample:
             raise ValueError("n > 1 needs do_sample=True (greedy decoding gives one output)")
+        if self.kind == "seq2seq" and any(len(split_sentences(s)) > 1 for s in sources):
+            # Sentence-level NMT (OPUS-MT): translate paragraphs sentence by sentence and
+            # rejoin. Whole WMT24 paragraphs exceed its 512 positions and crash on the GPU.
+            pieces, owner = [], []
+            for i, s in enumerate(sources):
+                for sent in split_sentences(s):
+                    pieces.append(sent)
+                    owner.append(i)
+            outs = self.generate(pieces, src_lang, tgt_lang, n, do_sample, temperature, top_p, seed, max_new_tokens)
+            joined: list[list[list[str]]] = [[[] for _ in range(n)] for _ in sources]
+            for i, o in zip(owner, outs):
+                for k in range(n):
+                    joined[i][k].append(o[k])
+            return [[" ".join(parts) for parts in per_src] for per_src in joined]
         texts = self._inputs(sources, src_lang, tgt_lang)
         self.tok.padding_side = "left" if self.kind == "causal" else "right"
         order = sorted(range(len(texts)), key=lambda i: -len(texts[i]))
         per_batch = max(1, self.batch_size // n)
         out: list[list[str]] = [[] for _ in texts]
-        gen = dict(max_new_tokens=max_new_tokens or self.max_new_tokens, num_return_sequences=n,
+        max_new = max_new_tokens or self.max_new_tokens
+        limit = None
+        if self.kind == "seq2seq":  # learned position embeddings: never exceed them
+            limit = getattr(self.model.config, "max_position_embeddings", 512)
+            max_new = min(max_new, limit - 1)
+        gen = dict(max_new_tokens=max_new, num_return_sequences=n,
                    do_sample=do_sample, pad_token_id=self.tok.pad_token_id)
         if do_sample:
             gen.update(temperature=temperature, top_p=top_p, top_k=0)
@@ -320,7 +365,8 @@ class Translator:
             for start in range(0, len(order), per_batch):
                 idx = order[start:start + per_batch]
                 enc = self.tok([texts[i] for i in idx], return_tensors="pt", padding=True,
-                               add_special_tokens=self.kind == "seq2seq").to(self.device)
+                               add_special_tokens=self.kind == "seq2seq",
+                               **({"truncation": True, "max_length": limit} if limit else {})).to(self.device)
                 enc.pop("token_type_ids", None)  # some tokenizers add it; decoder-only models reject it
                 ids = self.model.generate(**enc, **gen)
                 if self.kind == "causal":
