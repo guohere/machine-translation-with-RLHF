@@ -89,7 +89,7 @@ def _finish(trainer, cfg: dict, store: CheckpointStore, base_model: str, out_dir
     trainer.save_model(out_dir)
     write_json(os.path.join(out_dir, "log_history.json"), trainer.state.log_history)
     path = store.save(cfg["name"], out_dir, base_model, cfg["parent"] if cfg["parent"] != "base" else None,
-                      extra={"method": cfg["method"], **extra})
+                      extra={"method": cfg["method"], "data_sampling": cfg.get("data_sampling"), **extra})
     print(f"saved adapter '{cfg['name']}' -> {path}")
     return path
 
@@ -185,7 +185,8 @@ def train_grpo(cfg: dict, store: CheckpointStore) -> str:
             ckpt = os.path.join(a.output_dir, f"checkpoint-{state.global_step}")
             if os.path.isdir(ckpt):
                 store.save(f"{cfg['name']}-step{state.global_step}", ckpt, base, cfg["parent"],
-                           extra={"method": "grpo", "step": state.global_step})
+                           extra={"method": "grpo", "step": state.global_step,
+                                  "temperature": a.temperature, "top_p": a.top_p})
 
     prompts_per_step = args.per_device_train_batch_size * args.gradient_accumulation_steps // n_gen
     print(f"GRPO: {len(train)} prompts, {prompts_per_step} prompts x {n_gen} samples per step, "
@@ -195,6 +196,7 @@ def train_grpo(cfg: dict, store: CheckpointStore) -> str:
     trainer.train()
     path = _finish(trainer, cfg, store, base, out_dir,
                    {"n_prompts": len(train), "num_generations": n_gen, "beta": args.beta,
+                    "temperature": args.temperature, "top_p": args.top_p,
                     "reward": cfg["reward"], "guard_weights": gw, "prompts_per_step": prompts_per_step})
     reward.close()
     return path
@@ -220,6 +222,14 @@ def build_config(path: str, model: str | None = None, debug: bool = False, sets:
     with open(path) as fh:
         cfg = yaml.safe_load(fh)
     cfg.update(paths["overrides"].get(cfg["method"], {}))
+    if cfg["method"] == "grpo":  # same sampling setting as candidate sampling and best-of-N
+        from mtrlhf.sampling import load_sampling
+
+        chosen = load_sampling()
+        if chosen:
+            cfg["temperature"], cfg["top_p"] = chosen["temperature"], chosen["top_p"]
+        else:
+            print("(no sampling pilot result: GRPO samples with the config's temperature/top_p)")
     if model:
         cfg["base_model"] = paths["model_id"]
     cfg["out_root"] = paths["runs"]
@@ -234,7 +244,19 @@ def build_config(path: str, model: str | None = None, debug: bool = False, sets:
     for k, v in cfg.items():
         if isinstance(v, str):
             cfg[k] = v.replace("{shared}", "data/p2").replace("{model_data}", paths["model_data"])
+    cfg["data_sampling"] = data_sampling(cfg.get("data", ""))
     return cfg, ckpt, paths["hub_prefix"]
+
+
+def data_sampling(data_path: str) -> dict | None:
+    """Sampling setting behind sampled training data (RSFT targets, DPO pairs), if any."""
+    import json
+
+    stats = os.path.join(os.path.dirname(data_path), "pairs_stats.json")
+    if os.path.basename(data_path) in ("rsft.jsonl", "dpo_pairs.jsonl") and os.path.exists(stats):
+        with open(stats) as fh:
+            return json.load(fh).get("sampling")
+    return None
 
 
 def run(cfg: dict, store: CheckpointStore) -> str:

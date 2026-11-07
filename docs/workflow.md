@@ -182,7 +182,13 @@ Decision rule, written down before seeing any Phase 2 results:
 
 ### 5.2 Candidate sampling and scoring (shared by best-of-N, RSFT and DPO)
 
-- For each of the 5k pool prompts, sample N = 8 translations from S0 with vLLM (temperature ≈ 0.9, top-p 0.95).
+- **One sampling setting for every sampling-based method** (candidates, best-of-N, GRPO) and both models, chosen by a pilot (`scripts/p2_sampling_pilot.py`):
+  - **Data:** 200 held-out sentences (the SFT validation set), with temperature {0.6, 0.8, 1.0} × top-p {0.95, 1.0} and 8 samples each, scored with R_train.
+  - **Why a pilot:** the setting trades *diversity* against *quality*. The methods learn from differences between samples of the same source, but broken samples waste the reward budget and make DPO pairs trivially easy. Vendor defaults differ between models and target chat use.
+  - **Rule, fixed in advance:** among settings with ≤ 5% broken samples (MetricX error > 10), take the largest mean within-group reward spread. Near-ties go to top-p = 1.0, which keeps GRPO exactly on-policy, because TRL accounts for the temperature in its log-probabilities but not for top-p.
+  - **Where the choice lives:** `results/p2/sampling.json`, which every script reads. Samples drawn with different settings are never mixed, and RSFT/DPO adapters record which samples they were trained on.
+  - **Why it was added:** the first run sampled at temperature 1.0 without top-p. About 25% of the samples were broken, and the DPO pairs became mostly "good vs. gibberish".
+- For each of the 5k pool prompts, sample N = 8 translations from S0 with that setting.
 - Score all 40k candidates with R_train and store them as JSONL with the scores attached.
 - This file is the **matched reward budget** (40k reward calls). GRPO gets the same 40k through its own online sampling.
 

@@ -63,6 +63,12 @@ def main() -> None:
     if not cands:
         sys.exit(f"No sampled candidates in {args.candidates}: run p2_sample.py first (did it fail?)")
     rsft, dpo, stats = build(cands, args.rsft_min_score, args.dpo_margin)
+    from mtrlhf.io import read_json
+    from mtrlhf.sampling import group_stats
+
+    meta_path = os.path.splitext(args.candidates)[0] + ".meta.json"
+    stats["sampling"] = read_json(meta_path) if os.path.exists(meta_path) else None
+    stats["candidates"] = group_stats([[(x["hyp"], x["score"]) for x in c["samples"]] for c in cands])
     write_jsonl(os.path.join(args.out, "rsft.jsonl"), rsft)
     write_jsonl(os.path.join(args.out, "dpo_pairs.jsonl"), dpo)
     write_json(os.path.join(args.out, "pairs_stats.json"), stats)

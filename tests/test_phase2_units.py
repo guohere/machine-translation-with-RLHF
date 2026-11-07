@@ -274,3 +274,42 @@ def test_seq2seq_paragraphs_are_translated_sentence_by_sentence():
     assert sorted(texts) == sorted(["One.", "Two.", "Three.", "Single sentence"])
     assert kw["truncation"] is True and kw["max_length"] == 512
     assert model.seen[0]["max_new_tokens"] == 511  # capped below the 512 positions
+
+
+# --- sampling pilot ------------------------------------------------------------------
+
+def test_group_stats():
+    from mtrlhf.sampling import group_stats
+
+    groups = [[("a", -1.0), ("b", -3.0)], [("c", -12.0), ("c", -12.0)]]
+    s = group_stats(groups)
+    assert s["broken_pct"] == 50.0 and s["identical_groups_pct"] == 50.0
+    assert s["spread"] == pytest.approx(0.5) and s["mean_best"] == pytest.approx(-6.5)
+
+
+def test_choose_follows_the_preregistered_rule():
+    from mtrlhf.sampling import choose
+
+    r = lambda t, p, broken, spread: {"temperature": t, "top_p": p, "broken_pct": broken, "spread": spread}
+    grid = [r(0.6, 0.95, 0.5, 1.0), r(0.6, 1.0, 1.0, 1.2), r(0.8, 0.95, 2.0, 1.9), r(0.8, 1.0, 3.0, 1.92),
+            r(1.0, 0.95, 9.0, 3.0), r(1.0, 1.0, 25.0, 4.5)]
+    best, why = choose(grid)
+    # 1.0 settings exceed 5% broken; 0.8/0.95 and 0.8/1.0 tie on spread -> top_p 1.0 wins
+    assert (best["temperature"], best["top_p"]) == (0.8, 1.0) and "top_p = 1.0 preferred" in why
+    best, _ = choose([r(1.0, 1.0, 25.0, 4.5), r(0.6, 1.0, 8.0, 1.0)])
+    assert best["temperature"] == 0.6  # nothing eligible: fewest broken samples
+
+
+def test_every_method_reads_the_same_sampling_setting(tmp_path, monkeypatch):
+    from mtrlhf.sampling import resolve
+    from mtrlhf.train.methods import build_config
+
+    f = tmp_path / "sampling.json"
+    monkeypatch.setenv("MTRLHF_SAMPLING_FILE", str(f))
+    assert resolve(None, None)[:2] == (1.0, 1.0)  # no pilot yet: fallback
+    f.write_text('{"temperature": 0.8, "top_p": 1.0}')
+    assert resolve(None, None)[:2] == (0.8, 1.0) and resolve(0.5, 0.9)[:2] == (0.5, 0.9)
+    cfg, _, _ = build_config("configs/p2/grpo.yaml", "qwen3-1.7b")
+    assert (cfg["temperature"], cfg["top_p"]) == (0.8, 1.0)
+    cfg, _, _ = build_config("configs/p2/grpo.yaml", "qwen3-1.7b", sets=["temperature=0.5"])
+    assert cfg["temperature"] == 0.5  # explicit override still possible

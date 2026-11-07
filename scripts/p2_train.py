@@ -43,9 +43,14 @@ def main() -> None:
     cfg, ckpt, hub_prefix = build_config(args.config, args.model, args.debug, args.set, args.ckpt)
     store = CheckpointStore(ckpt) if args.debug else CheckpointStore.from_env(ckpt, args.hub_repo, hub_prefix)
     if store.has(cfg["name"]) and not args.force:
-        print(f"adapter '{cfg['name']}' already exists in {store.root}"
-              f"{' / ' + store.hub_repo if store.hub_repo else ''}; skipping (use --force to retrain)")
-        return
+        trained_on = store.meta(cfg["name"]).get("data_sampling")
+        if cfg.get("data_sampling") and trained_on != cfg["data_sampling"]:
+            print(f"adapter '{cfg['name']}' was trained on samples drawn with {trained_on}; the current samples "
+                  f"use {cfg['data_sampling']}: retraining")
+        else:
+            print(f"adapter '{cfg['name']}' already exists in {store.root}"
+                  f"{' / ' + store.hub_repo if store.hub_repo else ''}; skipping (use --force to retrain)")
+            return
     run(cfg, store)
 
 

@@ -31,8 +31,10 @@ def main() -> None:
     ap.add_argument("--model", default=None, help="policy model: qwen3-1.7b | gemma3-1b (sets the model id and per-model folders)")
     ap.add_argument("--out", default=None, help="default: data/p2/<model>/candidates.jsonl")
     ap.add_argument("--n", type=int, default=8)
-    ap.add_argument("--temperature", type=float, default=1.0)
-    ap.add_argument("--top-p", type=float, default=1.0)
+    ap.add_argument("--temperature", type=float, default=None, help="default: the sampling pilot's choice")
+    ap.add_argument("--top-p", type=float, default=None, help="default: the sampling pilot's choice")
+    ap.add_argument("--on-mismatch", choices=["error", "restart"], default="error",
+                    help="if OUT holds samples drawn with other settings: stop (default) or start over")
     ap.add_argument("--reward", default="metricx24_qe")
     ap.add_argument("--chunk", type=int, default=500, help="prompts per generate+score round")
     ap.add_argument("--batch-size", type=int, default=64, help="sequences per generation batch")
@@ -45,17 +47,35 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
+    from mtrlhf.io import read_json, write_json
     from mtrlhf.models import CheckpointStore, Translator, default_device, model_paths
     from mtrlhf.rewards import get_reward, reward_info
     from mtrlhf.rewards.guards import guard_flags
+    from mtrlhf.sampling import resolve
 
     paths = model_paths(args.model)
     args.out = args.out or os.path.join(paths["model_data"], "candidates.jsonl")
+    args.temperature, args.top_p, source = resolve(args.temperature, args.top_p)
+    print(f"sampling: temperature {args.temperature}, top-p {args.top_p} ({source})")
     prompts = read_jsonl(args.prompts)
     if not prompts:
         sys.exit(f"No prompts in {args.prompts}: run p2_prepare_data.py first")
     if args.limit:
         prompts = prompts[: args.limit]
+
+    # Never mix samples drawn with different settings in one file.
+    meta_path = os.path.splitext(args.out)[0] + ".meta.json"
+    meta = {"system": args.system, "n": args.n, "temperature": args.temperature, "top_p": args.top_p,
+            "reward": args.reward, "seed": args.seed}
+    if read_jsonl(args.out):
+        old = read_json(meta_path) if os.path.exists(meta_path) else None
+        if old != meta:
+            msg = f"{args.out} holds samples drawn with {old or 'unrecorded settings'}, not {meta}"
+            if args.on_mismatch == "error":
+                sys.exit(msg + " (use --on-mismatch restart to start over)")
+            print(msg + ": starting over")
+            os.remove(args.out)
+    write_json(meta_path, meta)
     done = {r["id"] for r in read_jsonl(args.out)}
     todo = [p for p in prompts if p["id"] not in done]
     print(f"{len(todo)} prompts to sample ({len(done)} already done), n={args.n}")

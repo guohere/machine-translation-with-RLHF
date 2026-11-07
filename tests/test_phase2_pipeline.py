@@ -20,11 +20,17 @@ from .tiny_lm import build_tiny_lm  # noqa: E402
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 
 
-def run(*args, env=None):
+ENV: dict = {}  # MTRLHF_SAMPLING_FILE points into the test's temp folder (set by the fixture)
+
+
+def run(*args, env=None, expect_ok=True):
     proc = subprocess.run([sys.executable, *args], cwd=ROOT, capture_output=True, text=True,
-                          env={**os.environ, **(env or {})})
-    assert proc.returncode == 0, proc.stdout[-3000:] + proc.stderr[-6000:]
-    return proc.stdout
+                          env={**os.environ, **ENV, **(env or {})})
+    if expect_ok:
+        assert proc.returncode == 0, proc.stdout[-3000:] + proc.stderr[-6000:]
+    else:
+        assert proc.returncode != 0, proc.stdout[-3000:]
+    return proc.stdout + proc.stderr
 
 
 @pytest.fixture(scope="module")
@@ -36,6 +42,9 @@ def setup(tmp_path_factory):
     write_jsonl(str(data / "sft_train.jsonl"), pairs)
     write_jsonl(str(data / "prompts.jsonl"), [{"id": f"p-{i}", "src": s, "ref": r}
                                               for i, (s, r) in enumerate(zip(SRC, REF_A))])
+    write_jsonl(str(data / "sft_val.jsonl"), [{"id": f"v-{i}", "src": s, "ref": r}
+                                              for i, (s, r) in enumerate(zip(SRC[:3], REF_A[:3]))])
+    ENV["MTRLHF_SAMPLING_FILE"] = str(tmp / "sampling.json")
     for name, (sl, tl) in {"flores_devtest.en-de": ("en", "de"), "flores_devtest.de-en": ("de", "en")}.items():
         src, ref = (SRC, REF_A) if sl == "en" else (REF_A, SRC)
         write_jsonl(str(data / "testsets" / f"{name}.jsonl"),
@@ -59,9 +68,23 @@ def test_phase2_end_to_end(setup):
     # an existing adapter is not retrained
     assert "already exists" in train(s, "configs/p2/sft.yaml", f"data={d}/sft_train.jsonl")
 
-    run("scripts/p2_sample.py", "--system", "sft", "--prompts", f"{d}/prompts.jsonl", "--n", "4",
-        "--reward", "chrf", "--out", f"{d}/candidates.jsonl", "--ckpt", s["ckpt"], "--max-new-tokens", "24",
-        "--chunk", "3")
+    # sampling pilot: chooses the setting every sampling-based method then uses
+    out = run("scripts/p2_sampling_pilot.py", "--system", "sft", "--prompts", f"{d}/sft_val.jsonl", "--limit", "3",
+              "--n", "3", "--temperatures", "0.7", "1.0", "--top-ps", "1.0", "--reward", "chrf",
+              "--max-new-tokens", "16", "--ckpt", s["ckpt"], "--out", str(s["tmp"] / "pilot"),
+              "--write", ENV["MTRLHF_SAMPLING_FILE"])
+    chosen = json.load(open(ENV["MTRLHF_SAMPLING_FILE"]))
+    assert chosen["temperature"] in (0.7, 1.0) and "Chosen: temperature" in out
+    assert os.path.exists(s["tmp"] / "pilot" / "report.md")
+
+    sample = ["scripts/p2_sample.py", "--system", "sft", "--prompts", f"{d}/prompts.jsonl", "--n", "4",
+              "--reward", "chrf", "--out", f"{d}/candidates.jsonl", "--ckpt", s["ckpt"], "--max-new-tokens", "24",
+              "--chunk", "3"]
+    assert "(sampling pilot" in run(*sample)
+    meta = json.load(open(f"{d}/candidates.meta.json"))
+    assert (meta["temperature"], meta["top_p"]) == (chosen["temperature"], chosen["top_p"])
+    # samples drawn with another setting are never mixed into the same file
+    assert "holds samples drawn with" in run(*sample, "--temperature", "0.5", "--top-p", "1.0", expect_ok=False)
     cands = read_jsonl(f"{d}/candidates.jsonl")
     assert len(cands) == len(SRC) and all(len(c["samples"]) == 4 for c in cands)
     assert set(cands[0]["samples"][0]["flags"]) == {"wrong_language", "number_mismatch", "length_ratio", "copy"}
@@ -70,8 +93,16 @@ def test_phase2_end_to_end(setup):
               "--rsft-min-score", "-1000", "--dpo-margin", "0")
     assert read_jsonl(f"{d}/rsft.jsonl") and read_jsonl(f"{d}/dpo_pairs.jsonl"), out
 
+    assert json.load(open(f"{d}/pairs_stats.json"))["sampling"]["temperature"] == chosen["temperature"]
     train(s, "configs/p2/rsft.yaml", f"data={d}/rsft.jsonl")
     train(s, "configs/p2/dpo.yaml", f"data={d}/dpo_pairs.jsonl")
+    assert "already exists" in train(s, "configs/p2/rsft.yaml", f"data={d}/rsft.jsonl")
+    # new samples with another setting -> RSFT is retrained on them, not silently kept
+    run(*sample, "--temperature", "0.5", "--top-p", "1.0", "--on-mismatch", "restart")
+    run("scripts/p2_build_pairs.py", "--candidates", f"{d}/candidates.jsonl", "--out", str(d),
+        "--rsft-min-score", "-1000", "--dpo-margin", "0")
+    assert "retraining" in train(s, "configs/p2/rsft.yaml", f"data={d}/rsft.jsonl")
+    assert json.load(open(os.path.join(s["ckpt"], "rsft", "mtrlhf_meta.json")))["data_sampling"]["temperature"] == 0.5
     train(s, "configs/p2/grpo_guarded.yaml", f"data={d}/prompts.jsonl", "reward=chrf", "num_generations=2",
           "batch_size=2", "save_steps=1", "max_completion_length=16", "sample_log_every=1")
     for name in ("rsft", "dpo", "grpo_guarded", "grpo_guarded-step1", "grpo_guarded-step2"):

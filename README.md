@@ -166,6 +166,7 @@ pip install --no-deps unbabel-comet==2.2.7 "git+https://github.com/google-resear
 python scripts/p2_prepare_data.py --out data/p2                      # News Commentary, FLORES-200, WMT24
 M=qwen3-1.7b                                                              # then M=gemma3-1b
 python scripts/p2_train.py --model $M --config configs/p2/sft.yaml       # S0: the shared starting point
+python scripts/p2_sampling_pilot.py --model $M --write results/p2/sampling.json  # once: one sampling setting for all
 python scripts/p2_sample.py --model $M --system sft --n 8 --reward metricx24_qe   # 5k prompts x 8, scored
 python scripts/p2_build_pairs.py --model $M                              # RSFT targets, DPO pairs
 python scripts/p2_train.py --model $M --config configs/p2/rsft.yaml      # main model only

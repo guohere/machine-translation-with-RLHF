@@ -38,11 +38,26 @@ def translate(args) -> None:
     from mtrlhf.models import EXTERNAL, CheckpointStore, Translator, default_device, model_paths
     from mtrlhf.rewards import get_reward, reward_info
 
+    from mtrlhf.io import read_json, write_json
+    from mtrlhf.sampling import resolve
+
     paths = model_paths(args.model)
     store = CheckpointStore.from_env(args.ckpt or paths["ckpt"], args.hub_repo, paths["hub_prefix"])
+    if args.best_of > 1:
+        args.temperature, args.top_p, source = resolve(args.temperature, args.top_p)
+        print(f"best-of-{args.best_of} sampling: temperature {args.temperature}, top-p {args.top_p} ({source})")
     rerank = None
     for system in args.systems:
         name = f"{system}+bo{args.best_of}" if args.best_of > 1 else system
+        if args.best_of > 1:  # redo best-of-N outputs drawn with a different sampling setting
+            meta_path = os.path.join(args.out, name, "_sampling.json")
+            meta = {"temperature": args.temperature, "top_p": args.top_p, "reranker": args.rerank_reward}
+            old = read_json(meta_path) if os.path.exists(meta_path) else None
+            if old != meta and glob.glob(os.path.join(args.out, name, "*.jsonl")):
+                print(f"{name}: outputs were sampled with {old}, now {meta}: translating again")
+                for f in glob.glob(os.path.join(args.out, name, "*.jsonl")):
+                    os.remove(f)
+            write_json(meta_path, meta)
         jobs = []
         for ts in args.testsets:
             rows = read_jsonl(os.path.join(args.data, "testsets", f"{ts}.jsonl"))
@@ -152,8 +167,8 @@ def main() -> None:
     ap.add_argument("--out", default=None, help="default: results/p2/<model>/outputs")
     ap.add_argument("--best-of", type=int, default=1)
     ap.add_argument("--rerank-reward", default="metricx24_qe")
-    ap.add_argument("--temperature", type=float, default=1.0)
-    ap.add_argument("--top-p", type=float, default=1.0)
+    ap.add_argument("--temperature", type=float, default=None, help="best-of-N sampling; default: pilot's choice")
+    ap.add_argument("--top-p", type=float, default=None, help="best-of-N sampling; default: pilot's choice")
     ap.add_argument("--batch-size", type=int, default=32)
     ap.add_argument("--max-new-tokens", type=int, default=None)
     ap.add_argument("--base-model", default=None)
