@@ -52,6 +52,8 @@ def main() -> None:
     paths = model_paths(args.model)
     args.out = args.out or os.path.join(paths["model_data"], "candidates.jsonl")
     prompts = read_jsonl(args.prompts)
+    if not prompts:
+        sys.exit(f"No prompts in {args.prompts}: run p2_prepare_data.py first")
     if args.limit:
         prompts = prompts[: args.limit]
     done = {r["id"] for r in read_jsonl(args.out)}

@@ -59,7 +59,10 @@ def main() -> None:
     args.candidates = args.candidates or os.path.join(model_data, "candidates.jsonl")
     args.out = args.out or model_data
 
-    rsft, dpo, stats = build(read_jsonl(args.candidates), args.rsft_min_score, args.dpo_margin)
+    cands = read_jsonl(args.candidates)
+    if not cands:
+        sys.exit(f"No sampled candidates in {args.candidates}: run p2_sample.py first (did it fail?)")
+    rsft, dpo, stats = build(cands, args.rsft_min_score, args.dpo_margin)
     write_jsonl(os.path.join(args.out, "rsft.jsonl"), rsft)
     write_jsonl(os.path.join(args.out, "dpo_pairs.jsonl"), dpo)
     write_json(os.path.join(args.out, "pairs_stats.json"), stats)
