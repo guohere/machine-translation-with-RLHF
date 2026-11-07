@@ -1,0 +1,8 @@
+{
+  "system": "sft",
+  "n": 8,
+  "temperature": 0.8,
+  "top_p": 1.0,
+  "reward": "metricx24_qe",
+  "seed": 0
+}
