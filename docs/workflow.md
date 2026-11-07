@@ -373,6 +373,7 @@ Evaluate S0 and every aligned system on FLORES devtest **de→en** (the reverse 
 | 2c | `python scripts/p2_sample.py --system sft --n 8 --reward metricx24_qe`, then `python scripts/p2_build_pairs.py` | `candidates.jsonl`, `rsft.jsonl`, `dpo_pairs.jsonl` |
 | 2d | `python scripts/p2_train.py --config configs/p2/{rsft,dpo,grpo,grpo_guarded}.yaml` | `ckpt/{rsft,dpo,grpo,grpo_guarded}`, `ckpt/grpo-step<k>` |
 | 2e | `python scripts/p2_translate.py --systems … [--best-of 8]` | `results/p2/outputs/<system>/<testset>.jsonl`, `quick_eval.md` |
+| all of 2 | `python scripts/p2_run.py` (what the Kaggle notebook runs) | the next block of work from `configs/p2/run.yaml`, skipping what is saved |
 | 3a | `python scripts/p3_evaluate.py --systems all --testsets flores_devtest wmt24` | `reports/p3/method_benchmark.csv` |
 | 3b | `python scripts/p3_hacking_report.py` | `reports/p3/exploits.md`, over-optimization plots |
 | 4a | `python scripts/p4_transcribe.py --whisper tiny base small medium large-v3-turbo --testsets fleurs_en mustc_tst_common` | `data/asr/*.jsonl`, WER table |

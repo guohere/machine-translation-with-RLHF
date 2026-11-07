@@ -1,0 +1,18 @@
+# Phase 2 run plan, read by scripts/p2_run.py (which the Kaggle notebook runs after
+# `git pull`). Because the plan lives in the repository, it can change without editing
+# or re-importing the notebook: just "Save & Run All" again. Every step skips work that
+# is already saved, so each run continues where the last one stopped.
+
+models: [qwen3-1.7b, gemma3-1b]   # main model first, then the replication
+model: auto           # auto = the first model whose GRPO runs are not finished yet
+part: auto            # auto = finish Part A; Part B starts in a run where Part A had nothing left to do
+                      # (each part then gets a fresh 12-hour Kaggle session); or A | B | ALL
+smoke_test: auto      # auto = only for a model without a trained sft adapter (its first run); or true | false
+hub_repo: auto        # private Hugging Face repo for adapters (needs a write HF_TOKEN); none = session only
+grpo_cometkiwi: false # optional extra run: does GRPO on CometKiwi drift into the wrong language?
+budget_step: 625      # GRPO step that matches the shared budget (5,000 prompts x 8 samples)
+n_samples: 8
+train_reward: metricx24_qe
+test_sets: [flores_devtest.en-de, wmt24.en-de, flores_devtest.de-en, flores_devtest.en-zh]
+dev_set: flores_dev.en-de
+quick_scores: [chrf, metricx24_qe, comet22]

@@ -153,7 +153,7 @@ pytest   # unit tests and an end-to-end run on a small fake dataset (no GPU, no 
 
 ## Running Phase 2
 
-**On Kaggle (recommended).** Open [`notebooks/p2_training.ipynb`](notebooks/p2_training.ipynb) with **GPU T4 ×2**, a *write* `HF_TOKEN` (adapters are saved to a private Hugging Face repo as they finish) and `GH_TOKEN`. Run it four times: `MODEL = "qwen3-1.7b"` with `PART = "A"` (data, SFT, sampling, RSFT, DPO; ~4–5 h), then `PART = "B"` (GRPO and guarded GRPO side by side; ~5–6 h), then the same two parts for `MODEL = "gemma3-1b"`, which is slower in fp32. These times are rough estimates. Every step skips work that is already saved.
+**On Kaggle (recommended).** Import [`notebooks/p2_training.ipynb`](notebooks/p2_training.ipynb) once (GPU T4 ×2, a *write* `HF_TOKEN`, `GH_TOKEN`), then click **Save Version → Save & Run All** and repeat after each run finishes. The notebook is only a launcher: it pulls the code and runs `scripts/p2_run.py`, which follows the plan in [`configs/p2/run.yaml`](configs/p2/run.yaml) and does whatever is left, in order. That is Qwen3 Part A (SFT, sampling pilot, samples, RSFT, DPO), Qwen3 Part B (GRPO, guarded GRPO), then the same for Gemma 3. Each part fits in one 12-hour session. Adapters are saved to a private Hugging Face repo and results to `results/p2/`, so every run continues where the last one stopped, and a failed step pushes its log.
 
 **Anywhere else:**
 
