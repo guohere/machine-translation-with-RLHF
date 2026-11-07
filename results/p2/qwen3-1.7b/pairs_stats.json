@@ -1,0 +1,8 @@
+{
+  "prompts": 0,
+  "rsft": 0,
+  "dpo_pairs": 0,
+  "dpo_margin_mean": null,
+  "rsft_min_score": -5.0,
+  "dpo_margin": 1.0
+}
