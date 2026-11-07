@@ -11,10 +11,10 @@ Existing output files are skipped, so the script can be re-run after a stop.
 OUT/quick_eval.md. The held-out evaluation and hacking analysis are Phase 3.
 
 Examples:
-  python scripts/p2_translate.py --systems base sft rsft dpo grpo grpo_guarded opus-mt \
-      --testsets flores_devtest.en-de wmt24.en-de flores_devtest.de-en flores_devtest.en-zh
-  python scripts/p2_translate.py --systems sft --best-of 8 --testsets flores_devtest.en-de
-  python scripts/p2_translate.py --summary-only --score chrf metricx24_qe comet22
+  python scripts/p2_translate.py --model qwen3-1.7b --systems base opus-mt sft rsft dpo grpo-step625
+  python scripts/p2_translate.py --model qwen3-1.7b --systems sft --best-of 8 --testsets flores_devtest.en-de
+  python scripts/p2_translate.py --model qwen3-1.7b --summary-only --score chrf metricx24_qe comet22
+  (outputs in results/p2/<model>/outputs/)
 """
 
 from __future__ import annotations
@@ -35,10 +35,11 @@ DEFAULT_SETS = ["flores_dev.en-de", "flores_devtest.en-de", "wmt24.en-de", "flor
 
 
 def translate(args) -> None:
-    from mtrlhf.models import DEFAULT_BASE, EXTERNAL, CheckpointStore, Translator, default_device
+    from mtrlhf.models import EXTERNAL, CheckpointStore, Translator, default_device, model_paths
     from mtrlhf.rewards import get_reward, reward_info
 
-    store = CheckpointStore.from_env(args.ckpt, args.hub_repo)
+    paths = model_paths(args.model)
+    store = CheckpointStore.from_env(args.ckpt or paths["ckpt"], args.hub_repo, paths["hub_prefix"])
     rerank = None
     for system in args.systems:
         name = f"{system}+bo{args.best_of}" if args.best_of > 1 else system
@@ -60,7 +61,7 @@ def translate(args) -> None:
             jobs.append((ts, rows, path))
         if not jobs:
             continue
-        tr = Translator.for_system(system, store, args.base_model or DEFAULT_BASE, device=default_device(0),
+        tr = Translator.for_system(system, store, args.base_model or paths["model_id"], device=default_device(0),
                                    batch_size=args.batch_size)
         if args.best_of > 1 and rerank is None:
             info = reward_info(args.rerank_reward)
@@ -147,7 +148,8 @@ def main() -> None:
     ap.add_argument("--systems", nargs="*", default=[])
     ap.add_argument("--testsets", nargs="+", default=DEFAULT_SETS)
     ap.add_argument("--data", default="data/p2")
-    ap.add_argument("--out", default="results/p2/outputs")
+    ap.add_argument("--model", default=None, help="policy model: qwen3-1.7b | gemma3-1b (sets the model id and per-model folders)")
+    ap.add_argument("--out", default=None, help="default: results/p2/<model>/outputs")
     ap.add_argument("--best-of", type=int, default=1)
     ap.add_argument("--rerank-reward", default="metricx24_qe")
     ap.add_argument("--temperature", type=float, default=1.0)
@@ -155,13 +157,16 @@ def main() -> None:
     ap.add_argument("--batch-size", type=int, default=32)
     ap.add_argument("--max-new-tokens", type=int, default=None)
     ap.add_argument("--base-model", default=None)
-    ap.add_argument("--ckpt", default="ckpt")
+    ap.add_argument("--ckpt", default=None)
     ap.add_argument("--hub-repo", default=None,
                     help='private HF repo mirroring the adapters ("auto" = <user>/mtrlhf-en-de-adapters, "none" = off; default: $MTRLHF_HUB_REPO)')
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--score", nargs="*", default=[], help="rewards for the quick summary, e.g. chrf metricx24_qe")
     ap.add_argument("--summary-only", action="store_true")
     args = ap.parse_args()
+    from mtrlhf.models import model_paths
+
+    args.out = args.out or model_paths(args.model)["outputs"]
     if not args.summary_only:
         translate(args)
     if args.score or args.summary_only:

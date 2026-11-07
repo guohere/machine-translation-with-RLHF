@@ -8,6 +8,7 @@ LANG_NAMES = {"en": "English", "de": "German", "zh": "Chinese"}
 
 _QUOTES_OPEN = "\"“„'«»"
 _QUOTES_CLOSE = "\"”“'»«"
+_THINK = re.compile(r"<think>.*?</think>\s*|</?think>", re.DOTALL)
 _LABEL = re.compile(
     r"^\s*(?:\*\*)?(?:german|deutsch|english|englisch|chinese|translation|übersetzung)"
     r"(?:\s+translation)?\s*(?:\*\*)?\s*[:：]\s*(?:\*\*)?\s*",
@@ -29,7 +30,8 @@ def extract_translation(reply: str, src: str | None = None) -> tuple[str, bool]:
     because heavy cleanup can hide problems.
     """
     text = reply.strip()
-    out = _LABEL.sub("", text)
+    out = _THINK.sub("", text).strip()  # Qwen3 reasoning blocks, should non-thinking mode leak
+    out = _LABEL.sub("", out)
     # A single-paragraph source should give a single-paragraph translation: drop
     # anything after a blank line (typically "Note: ..." explanations).
     if "\n\n" in out and (src is None or "\n\n" not in src):

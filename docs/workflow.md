@@ -19,7 +19,7 @@ flowchart TB
     end
 
     subgraph P2["2 · Optimize the reward"]
-        PD["en→de parallel data"] --> SFT["SFT<br/>Qwen2.5-1.5B + LoRA"]
+        PD["en→de parallel data"] --> SFT["SFT<br/>Qwen3-1.7B · Gemma 3 1B + LoRA"]
         PP["5k English prompts"] --> SMP["Sample 8 candidates per prompt (vLLM)<br/>score with R_train"]
         SFT --> SMP
         SMP --> BON["Best-of-N<br/>(test time)"]
@@ -212,7 +212,7 @@ $$\mathcal{L}_\text{DPO} = -\log\sigma\Big(\beta\big[\log\tfrac{\pi_\theta(y_w\m
 
 ```mermaid
 flowchart LR
-    P["Batch of English prompts"] --> G["Policy = S0 + new LoRA<br/>samples G = 8 translations each<br/>(vLLM, colocated)"]
+    P["Batch of English prompts"] --> G["Policy = S0 + new LoRA<br/>samples G = 8 translations each<br/>(HF generate)"]
     G --> R["Reward per sample<br/>R_train − penalties"]
     R --> A["Group-normalize per prompt<br/>A = (r − mean) / std"]
     A --> L["Policy-gradient loss<br/>+ β · KL to S0"]
@@ -227,7 +227,7 @@ $$A_i = \frac{r_i - \operatorname{mean}(r_1,\dots,r_G)}{\operatorname{std}(r_1,\
 
   Translations better than their siblings are reinforced and worse ones are suppressed. No value network is needed, which saves memory on one GPU.
 - A **KL penalty** (coefficient β) keeps the policy close to S0. β is set explicitly and swept (e.g. 0, 0.01, 0.05) rather than left at a library default.
-- **Single-GPU setup:** TRL `GRPOTrainer` with vLLM generation in colocate mode. The policy is 1.5B with LoRA; R_train runs in fp16 on the same card. Max completion length is about 128 tokens, G = 8 (4 if memory is tight), and gradient checkpointing is on.
+- **Single-GPU setup:** TRL `GRPOTrainer` with HF generation (vLLM optional later). The policy is a 1–2B model with LoRA, and R_train runs on the same card. The two GRPO runs of a model use the two T4s side by side. Max completion length is 160 tokens, G = 8 (4 if memory is tight), and gradient checkpointing is on.
 - **Budget:** the matched-budget checkpoint is taken at 40k sampled translations: step 625, with 8 prompts × 8 samples per step. Training continues to step 1250 *only* to trace the over-optimization curve, and adapters are exported every 125 steps. Any other checkpoint choice is made by R_eval on FLORES dev, never by R_train.
 - **Guards in both runs:** the four checks (wrong language, number mismatch, length ratio, copy) are reward functions in both GRPO runs. Plain GRPO gives them weight 0, so their rates are only logged. Guarded GRPO charges 5 MetricX points per violation. A sample of completions with scores and flags is written every 25 steps for the Phase 3 audit.
 

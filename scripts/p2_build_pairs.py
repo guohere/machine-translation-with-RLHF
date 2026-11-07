@@ -8,7 +8,7 @@ DPO:  (best, worst) per prompt, kept only if the score margin is at least
       are dropped.
 
 Example:
-  python scripts/p2_build_pairs.py --candidates data/p2/candidates.jsonl --out data/p2
+  python scripts/p2_build_pairs.py --model qwen3-1.7b     # reads/writes data/p2/qwen3-1.7b/
 """
 
 from __future__ import annotations
@@ -46,12 +46,18 @@ def build(cands: list[dict], rsft_min_score: float, dpo_margin: float) -> tuple[
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--candidates", default="data/p2/candidates.jsonl")
-    ap.add_argument("--out", default="data/p2")
+    ap.add_argument("--model", default=None, help="policy model: qwen3-1.7b | gemma3-1b (sets the model id and per-model folders)")
+    ap.add_argument("--candidates", default=None, help="default: data/p2/<model>/candidates.jsonl")
+    ap.add_argument("--out", default=None, help="default: data/p2/<model>")
     ap.add_argument("--rsft-min-score", type=float, default=-5.0,
                     help="MetricX-24-QE: keep best samples with error <= 5 (score >= -5)")
     ap.add_argument("--dpo-margin", type=float, default=1.0, help="minimum best-worst score difference")
     args = ap.parse_args()
+    from mtrlhf.models import model_paths
+
+    model_data = model_paths(args.model)["model_data"]
+    args.candidates = args.candidates or os.path.join(model_data, "candidates.jsonl")
+    args.out = args.out or model_data
 
     rsft, dpo, stats = build(read_jsonl(args.candidates), args.rsft_min_score, args.dpo_margin)
     write_jsonl(os.path.join(args.out, "rsft.jsonl"), rsft)

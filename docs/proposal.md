@@ -11,7 +11,7 @@
 
 RL-based fine-tuning methods (DPO, GRPO) can improve LLM translation by optimizing an automatic quality estimate instead of imitating a single reference. A policy can only be as good as its reward, though. **Whatever the reward cannot see, the policy is free to exploit.**
 
-This project studies that loop end to end. It uses one high-resource language pair (English→German), a small open model (Qwen2.5-1.5B with LoRA) and a single 24 GB GPU:
+This project studies that loop end to end. It uses one high-resource language pair (English→German), two small open models from different labs (Qwen3-1.7B as the main model, Gemma 3 1B as a replication, both with LoRA), and free Kaggle T4 GPUs:
 
 1. **Validate the reward.** Score WMT system outputs that experts have rated (MQM) with candidate quality-estimation (QE) reward models. Measure how well each one agrees with the humans *when comparing translations of the same source sentence*, and probe its blind spots with controlled perturbations.
 2. **Optimize it.** Start every method from the same SFT checkpoint and compare best-of-N reranking, rejection-sampling fine-tuning, DPO and GRPO on the same prompts with the same reward budget.
@@ -69,7 +69,7 @@ The mechanics of each component are in [`workflow.md`](workflow.md). This sectio
 
 ### Phase 2: Optimize the reward (four methods, one budget)
 
-- **Policy:** Qwen2.5-1.5B-Instruct with LoRA; Qwen2.5-0.5B for debugging.
+- **Policy models:** **Qwen3-1.7B** (main; non-thinking mode) and **Gemma 3 1B-it** (replication), both with LoRA. With one model, a finding such as "GRPO exploits MetricX's number blind spot" cannot be told apart from a quirk of that model. Two families from different labs are the minimum for a method-level claim. The main model runs every system; the replication runs the ones the main claims rest on (SFT, DPO, GRPO, guarded GRPO). Gemma overflows in fp16, so it runs in fp32 on T4 GPUs.
 - **SFT:** about 30k filtered en→de pairs from WMT training data (News Commentary, Europarl). Only heuristic filters are used: language ID, length ratio and deduplication. There is *no* QE filtering, so the baseline is not already tuned towards either reward.
 - **Prompt pool:** 5,000 English sentences from WMT News Crawl, deduplicated against every test set. All methods use this pool.
 - **Methods:**
@@ -83,7 +83,7 @@ The mechanics of each component are in [`workflow.md`](workflow.md). This sectio
 | GRPO + guards | Same as GRPO, with penalties for wrong language, extreme length and copying, plus a KL sweep | One-off, online |
 
 - **Matched budget:** the RSFT, DPO and GRPO comparison uses 5k prompts × 8 samples = **40k reward calls**. GRPO continues past this point only to trace the over-optimization curve.
-- **Anchors:** OPUS-MT en-de (classic NMT), Qwen2.5-1.5B zero-shot, and Qwen2.5-7B-Instruct zero-shot (a 5× larger model).
+- **Anchors:** OPUS-MT en-de (classic NMT) and each policy model zero-shot.
 - **Stretch:** CPO; MBR decoding; a "cross-reward" 2×2 that trains on each candidate reward and evaluates with the other.
 
 ### Phase 3: Close the loop
@@ -135,8 +135,7 @@ Only the method changes. Checkpoints are selected on FLORES-200 *dev*. Test sets
 | ID | System | Role |
 |---|---|---|
 | B0 | OPUS-MT en-de | Classic NMT anchor |
-| B1 | Qwen2.5-1.5B-Instruct, zero-shot | Lower bound |
-| B2 | Qwen2.5-7B-Instruct, zero-shot | "Can a small aligned model catch a 5× larger one?" |
+| B1 | Qwen3-1.7B and Gemma 3 1B, zero-shot | Lower bound per model |
 | S0 | SFT (LoRA) | Starting point for all methods |
 | A1 | S0 + best-of-8 with R_train | Inference-time alignment |
 | A2 | RSFT | Simplest training-time alignment |
@@ -178,7 +177,8 @@ Only the method changes. Checkpoints are selected on FLORES-200 *dev*. Test sets
 | FLORES-200 | Text dev/test | CC BY-SA 4.0 |
 | FLEURS | Speech test | CC BY 4.0 |
 | MuST-C v1 en-de | Speech test | CC BY-NC-ND 4.0 (registration) |
-| Qwen2.5-0.5B / 1.5B / 7B-Instruct | Policy and anchor | Apache-2.0 |
+| Qwen3-1.7B | Main policy model | Apache-2.0 |
+| Gemma 3 1B-it | Replication policy model | Gemma Terms of Use (gated) |
 | CometKiwi-22 (`Unbabel/wmt22-cometkiwi-da`) | Reward candidate | **Gated, CC BY-NC-SA 4.0: non-commercial use only** |
 | MetricX-24 (`google/metricx-24-hybrid-*`) | Reward candidate / evaluator | Apache-2.0 |
 | COMET-22 (`Unbabel/wmt22-comet-da`) | Evaluator | Apache-2.0 |
@@ -192,7 +192,7 @@ This is a non-commercial research project. Gated models require accepting their 
 | Step | Hardware | Rough GPU-hours |
 |---|---|---|
 | Phase 1: score WMT22–24 en→de with 2–4 rewards; probes | Free T4 (Kaggle / Colab) | 3–8 |
-| SFT (1.5B, LoRA, ~30k pairs) | 24 GB (RTX 4090 / L4 / A10) | 1–3 |
+| SFT (1–2B, LoRA, ~20k pairs), per model | Kaggle T4 | 1–3 |
 | Sample and score 5k × 8 candidates (vLLM) | 24 GB | 1–2 |
 | RSFT and DPO | 24 GB | 2–4 |
 | GRPO main run, KL sweep and guarded run (~4 runs) | 24 GB | 12–24 |

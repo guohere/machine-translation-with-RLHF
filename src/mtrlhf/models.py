@@ -1,7 +1,12 @@
-"""Systems, checkpoints and generation.
+"""Policy models, systems, checkpoints and generation.
 
-A *system* is a name such as "base", "sft", "dpo" or "grpo@625" (a GRPO checkpoint).
-Every trained system is a LoRA adapter stored under ckpt/<name>/ together with
+The experiment runs on two model families so that findings are not one model's
+quirk (see MODELS): Qwen3-1.7B is the main model, Gemma 3 1B the replication.
+Each model gets its own folders: ckpt/<model>/, runs/p2/<model>/,
+results/p2/<model>/outputs/ and <model>/ inside the Hub adapter repo.
+
+A *system* is a name such as "base", "sft", "dpo" or "grpo-step625" (a GRPO
+checkpoint). Every trained system is a LoRA adapter stored under <ckpt>/<name>/ together with
 mtrlhf_meta.json {"base_model", "parent"}. Loading a system loads the base model
 and merges the adapter chain (e.g. base -> sft -> dpo), so all methods share
 exactly the same starting point.
@@ -15,8 +20,41 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import tempfile
 
-DEFAULT_BASE = "Qwen/Qwen2.5-1.5B-Instruct"
+DEFAULT_BASE = "Qwen/Qwen3-1.7B"
+
+# Policy models. "systems" lists what each one trains (the replication model runs the
+# systems the main claims rest on); "overrides" adapt batch sizes per training method
+# (Gemma 3 has a 262k vocabulary and runs in fp32 on a T4, so its logits are large).
+MODELS = {
+    "qwen3-1.7b": {"model_id": "Qwen/Qwen3-1.7B", "role": "main",
+                   "systems": ["base", "opus-mt", "sft", "sft+bo8", "rsft", "dpo", "grpo", "grpo_guarded"]},
+    "gemma3-1b": {"model_id": "google/gemma-3-1b-it", "role": "replication",
+                  "systems": ["base", "sft", "dpo", "grpo", "grpo_guarded"],
+                  "overrides": {"sft": {"batch_size": 8, "grad_accum": 4},
+                                "dpo": {"batch_size": 4, "grad_accum": 8},
+                                "grpo": {"batch_size": 4, "grad_accum": 16, "epochs": 1}}},
+    "qwen2.5-1.5b": {"model_id": "Qwen/Qwen2.5-1.5B-Instruct", "role": "earlier default",
+                     "systems": ["base", "sft", "dpo", "grpo", "grpo_guarded"]},
+}
+# Models trained in bf16 whose activations overflow in fp16 (T4 GPUs have no bf16):
+# they run in fp32 on such GPUs.
+FP16_UNSAFE = ("gemma",)
+
+
+def model_paths(tag: str | None) -> dict:
+    """Model id and per-model folders. tag=None keeps the single-model layout."""
+    if not tag:
+        return {"tag": None, "model_id": DEFAULT_BASE, "ckpt": "ckpt", "runs": "runs/p2",
+                "outputs": "results/p2/outputs", "model_data": "data/p2", "hub_prefix": "", "overrides": {},
+                "systems": MODELS["qwen3-1.7b"]["systems"]}
+    if tag not in MODELS:
+        raise KeyError(f"Unknown model {tag!r}. Known: {', '.join(MODELS)}")
+    m = MODELS[tag]
+    return {"tag": tag, "model_id": m["model_id"], "ckpt": f"ckpt/{tag}", "runs": f"runs/p2/{tag}",
+            "outputs": f"results/p2/{tag}/outputs", "model_data": f"data/p2/{tag}", "hub_prefix": tag,
+            "overrides": m.get("overrides", {}), "systems": m["systems"]}
 META = "mtrlhf_meta.json"
 ADAPTER_FILES = ("adapter_config.json", "adapter_model.safetensors", "adapter_model.bin", META)
 
@@ -32,13 +70,17 @@ EXTERNAL = {
 class CheckpointStore:
     """Local adapter folders, optionally mirrored to a private Hugging Face Hub repo."""
 
-    def __init__(self, root: str = "ckpt", hub_repo: str | None = None):
+    def __init__(self, root: str = "ckpt", hub_repo: str | None = None, hub_prefix: str = ""):
         self.root = root
         self.hub_repo = hub_repo
+        self.hub_prefix = hub_prefix.strip("/")
         os.makedirs(root, exist_ok=True)
 
+    def _remote(self, name: str) -> str:
+        return f"{self.hub_prefix}/{name}" if self.hub_prefix else name
+
     @classmethod
-    def from_env(cls, root: str = "ckpt", hub_repo: str | None = None) -> "CheckpointStore":
+    def from_env(cls, root: str = "ckpt", hub_repo: str | None = None, hub_prefix: str = "") -> "CheckpointStore":
         """Use `hub_repo` (or $MTRLHF_HUB_REPO). "auto" means <your HF user>/mtrlhf-en-de-adapters,
         created as a private repo if the token can write; otherwise local only."""
         hub_repo = hub_repo or os.environ.get("MTRLHF_HUB_REPO") or None
@@ -55,7 +97,7 @@ class CheckpointStore:
                 print(f"(Hub mirror disabled: {e.__class__.__name__}: {e}. "
                       "Use a Hugging Face token with write access to keep adapters across sessions.)")
                 hub_repo = None
-        return cls(root, hub_repo)
+        return cls(root, hub_repo, hub_prefix)
 
     def path(self, name: str) -> str:
         return os.path.join(self.root, name)
@@ -68,10 +110,14 @@ class CheckpointStore:
         if not self.exists_locally(name) and self.hub_repo:
             from huggingface_hub import snapshot_download
 
+            remote = self._remote(name)
             try:
-                snapshot_download(self.hub_repo, allow_patterns=[f"{name}/*"], local_dir=self.root)
+                with tempfile.TemporaryDirectory() as tmp:
+                    snapshot_download(self.hub_repo, allow_patterns=[f"{remote}/*"], local_dir=tmp)
+                    if os.path.isdir(os.path.join(tmp, remote)):
+                        shutil.copytree(os.path.join(tmp, remote), self.path(name), dirs_exist_ok=True)
             except Exception as e:
-                print(f"(could not pull {name} from {self.hub_repo}: {e})")
+                print(f"(could not pull {remote} from {self.hub_repo}: {e})")
         if not self.exists_locally(name):
             raise FileNotFoundError(f"No adapter '{name}' in {self.root}" +
                                     (f" or {self.hub_repo}" if self.hub_repo else ""))
@@ -103,9 +149,9 @@ class CheckpointStore:
         from huggingface_hub import upload_folder
 
         try:
-            upload_folder(repo_id=self.hub_repo, folder_path=self.path(name), path_in_repo=name,
-                          commit_message=f"adapter {name}")
-            print(f"pushed adapter {name} to {self.hub_repo}")
+            upload_folder(repo_id=self.hub_repo, folder_path=self.path(name), path_in_repo=self._remote(name),
+                          commit_message=f"adapter {self._remote(name)}")
+            print(f"pushed adapter {self._remote(name)} to {self.hub_repo}")
         except Exception as e:
             print(f"(push of {name} failed: {e})")
 
@@ -116,12 +162,24 @@ class CheckpointStore:
 
 # --- devices and loading -------------------------------------------------------------
 
-def pick_dtype(device: str | None = None):
+def bf16_supported() -> bool:
+    import torch
+
+    return torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8
+
+
+def fp16_safe(model_id: str) -> bool:
+    return not any(k in model_id.lower() for k in FP16_UNSAFE)
+
+
+def pick_dtype(device: str | None = None, model_id: str = DEFAULT_BASE):
+    """bf16 on GPUs that have it; otherwise fp16, or fp32 for models that overflow in fp16."""
     import torch
 
     if torch.cuda.is_available() and (device is None or str(device).startswith("cuda")):
-        major, _ = torch.cuda.get_device_capability()
-        return torch.bfloat16 if major >= 8 else torch.float16
+        if bf16_supported():
+            return torch.bfloat16
+        return torch.float16 if fp16_safe(model_id) else torch.float32
     return torch.float32
 
 
@@ -158,12 +216,26 @@ def adapter_chain(name: str, store: CheckpointStore) -> tuple[str | None, list[s
     return base, chain
 
 
+NO_THINKING = "{%- set enable_thinking = false %}\n"
+
+
+def disable_thinking(tokenizer) -> None:
+    """Qwen3 'thinks' (<think>...</think>) unless enable_thinking=False is passed to the
+    chat template. TRL's SFT and DPO trainers cannot pass it, so the template itself is
+    changed to default to non-thinking mode. Training and inference then render the
+    same prompt, ending in an empty <think></think> block, and the model answers directly."""
+    tpl = getattr(tokenizer, "chat_template", None)
+    if isinstance(tpl, str) and "enable_thinking" in tpl and not tpl.startswith(NO_THINKING):
+        tokenizer.chat_template = NO_THINKING + tpl
+
+
 def load_tokenizer(model_id: str):
     from transformers import AutoTokenizer
 
     tok = AutoTokenizer.from_pretrained(model_id)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
+    disable_thinking(tok)
     return tok
 
 
@@ -179,7 +251,7 @@ def load_causal(name: str, store: CheckpointStore | None = None, base_model: str
         b, chain = adapter_chain(name, store)
         base_model = b or base_model
     device = device or default_device()
-    dtype = dtype or pick_dtype(device)
+    dtype = dtype or pick_dtype(device, base_model)
     tok = load_tokenizer(base_model)
     model = AutoModelForCausalLM.from_pretrained(base_model, dtype=dtype)
     for adapter in chain:

@@ -34,13 +34,18 @@ DEFAULTS = {
 }
 
 
-def precision_kwargs() -> dict:
+def precision_kwargs(model_id: str) -> dict:
+    """bf16 where the GPU has it; fp16 mixed precision on older GPUs (T4), except for
+    models that overflow in fp16 (Gemma), which then train in plain fp32."""
     import torch
+
+    from mtrlhf.models import bf16_supported, fp16_safe
 
     if not torch.cuda.is_available():
         return {"bf16": False, "fp16": False, "use_cpu": True}
-    major, _ = torch.cuda.get_device_capability()
-    return {"bf16": True, "fp16": False} if major >= 8 else {"bf16": False, "fp16": True}
+    if bf16_supported():
+        return {"bf16": True, "fp16": False}
+    return {"bf16": False, "fp16": fp16_safe(model_id)}
 
 
 def lora_config(cfg: dict):
@@ -51,7 +56,7 @@ def lora_config(cfg: dict):
                       target_modules=lc["target_modules"], task_type="CAUSAL_LM")
 
 
-def common_args(cfg: dict, out_dir: str) -> dict:
+def common_args(cfg: dict, out_dir: str, model_id: str) -> dict:
     return dict(
         output_dir=out_dir,
         num_train_epochs=cfg["epochs"],
@@ -65,7 +70,7 @@ def common_args(cfg: dict, out_dir: str) -> dict:
         gradient_checkpointing=cfg["gradient_checkpointing"],
         seed=cfg["seed"],
         report_to="none",
-        **precision_kwargs(),
+        **precision_kwargs(model_id),
     )
 
 
@@ -101,7 +106,7 @@ def train_sft(cfg: dict, store: CheckpointStore) -> str:
     train = Dataset.from_list([example(r) for r in _rows(cfg["data"], cfg["limit"])])
     model, tok, base = load_causal(cfg["parent"], store, cfg["base_model"])
     out_dir = os.path.join(cfg["out_root"], cfg["name"])
-    args = SFTConfig(**common_args(cfg, out_dir), max_length=cfg["max_length"], save_strategy="no",
+    args = SFTConfig(**common_args(cfg, out_dir, base), max_length=cfg["max_length"], save_strategy="no",
                      completion_only_loss=True)
     trainer = SFTTrainer(model=model, args=args, train_dataset=train, processing_class=tok,
                          peft_config=lora_config(cfg))
@@ -123,7 +128,7 @@ def train_dpo(cfg: dict, store: CheckpointStore) -> str:
     train = Dataset.from_list([example(r) for r in _rows(cfg["data"], cfg["limit"])])
     model, tok, base = load_causal(cfg["parent"], store, cfg["base_model"])
     out_dir = os.path.join(cfg["out_root"], cfg["name"])
-    args = DPOConfig(**common_args(cfg, out_dir), beta=cfg.get("beta", 0.1), max_length=cfg["max_length"],
+    args = DPOConfig(**common_args(cfg, out_dir, base), beta=cfg.get("beta", 0.1), max_length=cfg["max_length"],
                      save_strategy="no")
     trainer = DPOTrainer(model=model, args=args, train_dataset=train, processing_class=tok,
                          peft_config=lora_config(cfg))
@@ -163,7 +168,7 @@ def train_grpo(cfg: dict, store: CheckpointStore) -> str:
         weights.append(float(gw.get(g, 0.0)))
 
     args = GRPOConfig(
-        **common_args(cfg, out_dir),
+        **common_args(cfg, out_dir, base),
         num_generations=n_gen,
         max_completion_length=cfg.get("max_completion_length", 160),
         temperature=cfg.get("temperature", 1.0),
@@ -196,6 +201,40 @@ def train_grpo(cfg: dict, store: CheckpointStore) -> str:
 
 
 METHODS = {"sft": train_sft, "dpo": train_dpo, "grpo": train_grpo}
+
+# --debug keeps the real model (so GPU memory and chat templates are tested) but uses
+# a few examples and steps, and a separate local store that never touches the Hub.
+DEBUG = {"limit": 64, "max_steps": 4, "logging_steps": 1, "save_steps": 2, "batch_size": 4, "grad_accum": 1,
+         "num_generations": 4}
+
+
+def build_config(path: str, model: str | None = None, debug: bool = False, sets: list[str] = (),
+                 ckpt: str | None = None) -> tuple[dict, str, str]:
+    """YAML config + per-model overrides + debug settings + KEY=VALUE overrides, with the
+    {shared} / {model_data} data placeholders resolved. Returns (cfg, ckpt_root, hub_prefix)."""
+    import yaml
+
+    from mtrlhf.models import model_paths
+
+    paths = model_paths(model)
+    with open(path) as fh:
+        cfg = yaml.safe_load(fh)
+    cfg.update(paths["overrides"].get(cfg["method"], {}))
+    if model:
+        cfg["base_model"] = paths["model_id"]
+    cfg["out_root"] = paths["runs"]
+    ckpt = ckpt or paths["ckpt"]
+    if debug:
+        cfg.update({k: v for k, v in DEBUG.items() if not (k == "num_generations" and cfg["method"] != "grpo")})
+        cfg["out_root"] = paths["runs"] + "_debug"
+        ckpt = ckpt + "_debug"
+    for kv in sets:  # explicit overrides win
+        k, v = kv.split("=", 1)
+        cfg[k] = yaml.safe_load(v)
+    for k, v in cfg.items():
+        if isinstance(v, str):
+            cfg[k] = v.replace("{shared}", "data/p2").replace("{model_data}", paths["model_data"])
+    return cfg, ckpt, paths["hub_prefix"]
 
 
 def run(cfg: dict, store: CheckpointStore) -> str:

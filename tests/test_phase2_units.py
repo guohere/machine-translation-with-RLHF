@@ -1,4 +1,5 @@
 import gzip
+import os
 import io
 import tarfile
 
@@ -103,3 +104,89 @@ def test_debug_store_never_uses_the_hub(monkeypatch, tmp_path):
     assert CheckpointStore.from_env(str(tmp_path / "ckpt")).hub_repo == "someone/real-adapters"
     assert CheckpointStore.from_env(str(tmp_path / "ckpt_debug")).hub_repo is None
     assert CheckpointStore.from_env(str(tmp_path / "ckpt"), "none").hub_repo is None
+
+
+# --- two model families ------------------------------------------------------------
+
+def test_model_configs_per_family():
+    from mtrlhf.train.methods import build_config
+
+    cfg, ckpt, prefix = build_config("configs/p2/grpo.yaml", "gemma3-1b")
+    assert cfg["base_model"] == "google/gemma-3-1b-it" and ckpt == "ckpt/gemma3-1b" and prefix == "gemma3-1b"
+    assert (cfg["batch_size"], cfg["grad_accum"], cfg["epochs"]) == (4, 16, 1)  # still 8 prompts per step
+    assert cfg["batch_size"] * cfg["grad_accum"] // cfg["num_generations"] == 8
+    assert cfg["data"] == "data/p2/prompts.jsonl" and cfg["out_root"] == "runs/p2/gemma3-1b"
+    cfg, _, _ = build_config("configs/p2/dpo.yaml", "qwen3-1.7b")
+    assert cfg["data"] == "data/p2/qwen3-1.7b/dpo_pairs.jsonl" and cfg["base_model"] == "Qwen/Qwen3-1.7B"
+    cfg, ckpt, _ = build_config("configs/p2/grpo.yaml", "qwen3-1.7b", debug=True, sets=["beta=0.0"])
+    assert ckpt == "ckpt/qwen3-1.7b_debug" and cfg["max_steps"] == 4 and cfg["beta"] == 0.0
+    assert cfg["batch_size"] * cfg["grad_accum"] % cfg["num_generations"] == 0
+
+
+def test_precision_follows_the_model():
+    from mtrlhf.models import fp16_safe, pick_dtype
+
+    assert fp16_safe("Qwen/Qwen3-1.7B") and not fp16_safe("google/gemma-3-1b-it")
+    import torch
+
+    assert pick_dtype("cpu", "google/gemma-3-1b-it") == torch.float32
+
+
+QWEN3_LIKE_TEMPLATE = (
+    "{%- for message in messages %}"
+    "{%- if message.role == 'user' %}{{- '<|im_start|>user\\n' + message.content + '<|im_end|>\\n' }}"
+    "{%- elif message.role == 'assistant' %}"
+    "{{- '<|im_start|>assistant\\n<think>\\n\\n</think>\\n\\n' + message.content + '<|im_end|>\\n' }}"
+    "{%- endif %}{%- endfor %}"
+    "{%- if add_generation_prompt %}{{- '<|im_start|>assistant\\n' }}"
+    "{%- if enable_thinking is defined and enable_thinking is false %}{{- '<think>\\n\\n</think>\\n\\n' }}{%- endif %}"
+    "{%- endif %}"
+)
+
+
+def test_qwen3_thinking_is_off_everywhere(tmp_path):
+    pytest.importorskip("transformers")
+    from tests.tiny_lm import build_tiny_lm
+    from mtrlhf.models import disable_thinking
+    from transformers import AutoTokenizer
+
+    tok = AutoTokenizer.from_pretrained(build_tiny_lm(str(tmp_path / "m"), ["hallo welt", "hello world"]))
+    tok.chat_template = QWEN3_LIKE_TEMPLATE
+    msgs = [{"role": "user", "content": "Translate: hello"}]
+    before = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
+    disable_thinking(tok)
+    disable_thinking(tok)  # idempotent
+    prompt = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
+    full = tok.apply_chat_template(msgs + [{"role": "assistant", "content": "hallo"}], tokenize=False)
+    assert not before.endswith("</think>\n\n") and prompt.endswith("<think>\n\n</think>\n\n")
+    assert full.startswith(prompt)  # SFT/DPO train on exactly the prompt used at inference
+    # even an explicit request for thinking is ignored
+    assert tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True,
+                                   enable_thinking=True) == prompt
+
+
+def test_think_blocks_are_stripped():
+    assert prompts.extract_translation("<think>\nhmm\n</think>\n\nHallo Welt.", "Hello world.")[0] == "Hallo Welt."
+    assert prompts.extract_translation("<think></think>Hallo.", "Hi.")[0] == "Hallo."
+
+
+def test_store_uses_a_per_model_folder_in_the_hub_repo(tmp_path, monkeypatch):
+    import huggingface_hub
+
+    from mtrlhf.models import CheckpointStore
+
+    uploads = []
+    monkeypatch.setattr(huggingface_hub, "upload_folder",
+                        lambda **kw: uploads.append((kw["repo_id"], kw["path_in_repo"])))
+
+    def fake_snapshot(repo_id, allow_patterns, local_dir):
+        remote = allow_patterns[0].rstrip("/*")
+        os.makedirs(os.path.join(local_dir, remote), exist_ok=True)
+        open(os.path.join(local_dir, remote, "mtrlhf_meta.json"), "w").write('{"base_model": "x", "parent": null}')
+
+    monkeypatch.setattr(huggingface_hub, "snapshot_download", fake_snapshot)
+    store = CheckpointStore(str(tmp_path / "ckpt" / "gemma3-1b"), "me/adapters", "gemma3-1b")
+    os.makedirs(store.path("sft"))
+    store.save("sft", store.path("sft"), "google/gemma-3-1b-it", None)
+    assert uploads == [("me/adapters", "gemma3-1b/sft")]
+    assert store.ensure("dpo") == store.path("dpo") and store.meta("dpo")["base_model"] == "x"

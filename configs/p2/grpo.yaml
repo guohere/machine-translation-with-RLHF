@@ -6,7 +6,7 @@
 name: grpo
 method: grpo
 parent: sft
-data: data/p2/prompts.jsonl
+data: "{shared}/prompts.jsonl"
 reward: metricx24_qe
 num_generations: 8
 batch_size: 8          # completions per micro-batch (= 1 prompt x 8 samples)

@@ -3,8 +3,8 @@
 name: sft
 method: sft
 parent: base
-base_model: Qwen/Qwen2.5-1.5B-Instruct
-data: data/p2/sft_train.jsonl
+base_model: Qwen/Qwen3-1.7B   # replaced by --model
+data: "{shared}/sft_train.jsonl"
 epochs: 1
 learning_rate: 2.0e-4
 batch_size: 16

@@ -21,7 +21,7 @@ RL fine-tuning (DPO, GRPO) lets a translation model optimize a quality metric in
 flowchart LR
     A["WMT expert ratings<br/>(MQM)"] --> B["1 · Validate reward<br/>accuracy + blind spots"]
     B -->|R_train| C["2 · Optimize<br/>Best-of-N · RSFT · DPO · GRPO"]
-    D["SFT model<br/>Qwen2.5-1.5B + LoRA"] --> C
+    D["SFT models<br/>Qwen3-1.7B · Gemma 3 1B + LoRA"] --> C
     C --> E["3 · Close the loop<br/>held-out R_eval · human check"]
     B -.->|blind spots predict exploits| E
     C --> F["4 · Speech cascade<br/>Whisper → MT"]
@@ -36,11 +36,11 @@ Best-of-N picks the top candidate for a sentence. DPO learns from a better/worse
 | | Choice |
 |---|---|
 | Language pair | **English → German.** One high-resource pair, so that the effect of the training method can be isolated |
-| Policy | Qwen2.5-1.5B-Instruct + LoRA (0.5B for debugging) |
+| Policy models | **Qwen3-1.7B** (main, non-thinking mode) and **Gemma 3 1B-it** (replication, a different lab), both with LoRA. Two families, so findings are not one model's quirk |
 | Reward candidates | CometKiwi-22 (QE) and MetricX-24 in QE mode. COMET-22, MetricX-24 with references and chrF serve as reference-based comparisons |
 | Human judgements | WMT22–24 en→de MQM via [`mt-metrics-eval`](https://github.com/google-research/mt-metrics-eval). WMT22 + WMT23 decide the reward choice; WMT24 (newest, LLM-era systems) is a separate check |
 | Alignment methods | Best-of-N reranking · rejection-sampling FT (RSFT) · DPO · GRPO · GRPO + guards |
-| Anchors | OPUS-MT en-de (classic NMT) · Qwen2.5-1.5B zero-shot · Qwen2.5-7B zero-shot |
+| Anchors | OPUS-MT en-de (classic NMT) · each policy model zero-shot |
 | Text test sets | FLORES-200 devtest (primary), WMT24 en→de (secondary); de→en and en→zh as a forgetting check |
 | Speech test sets | FLEURS (English), MuST-C tst-COMMON (en→de). ASR: Whisper tiny → large-v3-turbo |
 | Hardware | One 24 GB GPU; free T4s for debugging and Phase 1 scoring. About 25–45 GPU-hours in total |
@@ -81,8 +81,7 @@ What Phase 1 found:
 | System | R_eval ↑ | COMET-22 ↑ | chrF ↑ | R_train ↑ *(trained on)* | Exploit rate ↓ | Inference cost |
 |---|---|---|---|---|---|---|
 | OPUS-MT en-de | – | – | – | – | – | 1× (≈74M params) |
-| Qwen2.5-1.5B zero-shot | – | – | – | – | – | 1× |
-| Qwen2.5-7B zero-shot | – | – | – | – | – | ≈5× params |
+| Qwen3-1.7B zero-shot | – | – | – | – | – | 1× |
 | SFT | – | – | – | – | – | 1× |
 | SFT + best-of-8 | – | – | – | – | – | 8 samples + 8 reward calls |
 | RSFT | – | – | – | – | – | 1× |
@@ -154,7 +153,7 @@ pytest   # unit tests and an end-to-end run on a small fake dataset (no GPU, no 
 
 ## Running Phase 2
 
-**On Kaggle (recommended).** Open [`notebooks/p2_training.ipynb`](notebooks/p2_training.ipynb) with **GPU T4 ×2**, a *write* `HF_TOKEN` (adapters are saved to a private Hugging Face repo as they finish) and `GH_TOKEN`. Run it with `PART = "A"` (data, SFT, sampling, RSFT, DPO; ~4–5 h), then `PART = "B"` (GRPO and guarded GRPO side by side; ~5–6 h). These times are rough estimates. Every step skips work that is already saved.
+**On Kaggle (recommended).** Open [`notebooks/p2_training.ipynb`](notebooks/p2_training.ipynb) with **GPU T4 ×2**, a *write* `HF_TOKEN` (adapters are saved to a private Hugging Face repo as they finish) and `GH_TOKEN`. Run it four times: `MODEL = "qwen3-1.7b"` with `PART = "A"` (data, SFT, sampling, RSFT, DPO; ~4–5 h), then `PART = "B"` (GRPO and guarded GRPO side by side; ~5–6 h), then the same two parts for `MODEL = "gemma3-1b"`, which is slower in fp32. These times are rough estimates. Every step skips work that is already saved.
 
 **Anywhere else:**
 
@@ -165,19 +164,20 @@ pip install --no-deps unbabel-comet==2.2.7 "git+https://github.com/google-resear
 
 ```bash
 python scripts/p2_prepare_data.py --out data/p2                      # News Commentary, FLORES-200, WMT24
-python scripts/p2_train.py --config configs/p2/sft.yaml                # S0: the shared starting point
-python scripts/p2_sample.py --system sft --n 8 --reward metricx24_qe   # 5k prompts x 8 samples, scored
-python scripts/p2_build_pairs.py                                       # RSFT targets, DPO pairs
-python scripts/p2_train.py --config configs/p2/rsft.yaml
-python scripts/p2_train.py --config configs/p2/dpo.yaml
-python scripts/p2_train.py --config configs/p2/grpo.yaml               # guards logged only
-python scripts/p2_train.py --config configs/p2/grpo_guarded.yaml       # guards as penalties
-python scripts/p2_translate.py --systems base opus-mt sft rsft dpo grpo-step625 grpo_guarded-step625
-python scripts/p2_translate.py --systems sft --best-of 8
-python scripts/p2_translate.py --summary-only --score chrf metricx24_qe comet22
+M=qwen3-1.7b                                                              # then M=gemma3-1b
+python scripts/p2_train.py --model $M --config configs/p2/sft.yaml       # S0: the shared starting point
+python scripts/p2_sample.py --model $M --system sft --n 8 --reward metricx24_qe   # 5k prompts x 8, scored
+python scripts/p2_build_pairs.py --model $M                              # RSFT targets, DPO pairs
+python scripts/p2_train.py --model $M --config configs/p2/rsft.yaml      # main model only
+python scripts/p2_train.py --model $M --config configs/p2/dpo.yaml
+python scripts/p2_train.py --model $M --config configs/p2/grpo.yaml      # guards logged only
+python scripts/p2_train.py --model $M --config configs/p2/grpo_guarded.yaml   # guards as penalties
+python scripts/p2_translate.py --model $M --systems base opus-mt sft rsft dpo grpo-step625 grpo_guarded-step625
+python scripts/p2_translate.py --model $M --systems sft --best-of 8
+python scripts/p2_translate.py --model $M --summary-only --score chrf metricx24_qe comet22
 ```
 
-Add `--debug` to `p2_train.py` for a few-minute run with the 0.5B model and a separate checkpoint folder.
+Add `--debug` to `p2_train.py` for a few-step run with the real model and a separate checkpoint folder. Every Phase 2 script takes `--model qwen3-1.7b | gemma3-1b`, which selects the model, its per-model folders (`ckpt/<model>/`, `results/p2/<model>/`) and its batch sizes. Gemma runs in fp32 on a T4, because it overflows in fp16.
 
 ## Later phases (target interface)
 
@@ -214,7 +214,7 @@ The code is released under the [MIT License](LICENSE). Some models and datasets 
 
 - **CometKiwi** (`Unbabel/wmt22-cometkiwi-da`) is **gated** on Hugging Face and licensed **CC BY-NC-SA 4.0, for non-commercial use only**. Accept the license on its model page before downloading.
 - **MuST-C** is CC BY-NC-ND 4.0 and requires registration. FLORES-200 is CC BY-SA 4.0, and FLEURS is CC BY 4.0.
-- MetricX-24, COMET-22, the Qwen2.5 (0.5B/1.5B/7B) models and Whisper are under permissive licenses (Apache-2.0 / MIT).
+- MetricX-24, COMET-22, Qwen3 and Whisper are under permissive licenses (Apache-2.0 / MIT). **Gemma 3** is gated under the Gemma Terms of Use; accept them on its model page.
 
 This is a non-commercial research project.
 

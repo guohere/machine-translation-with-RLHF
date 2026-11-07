@@ -2,7 +2,7 @@
 name: dpo
 method: dpo
 parent: sft
-data: data/p2/dpo_pairs.jsonl
+data: "{model_data}/dpo_pairs.jsonl"
 beta: 0.1
 epochs: 1
 learning_rate: 2.0e-5

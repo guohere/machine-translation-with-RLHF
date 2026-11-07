@@ -7,8 +7,8 @@ samples = 40,000 reward calls). Each output row:
 Resumable: prompts already in OUT are skipped.
 
 Example:
-  python scripts/p2_sample.py --system sft --prompts data/p2/prompts.jsonl --n 8 \
-      --reward metricx24_qe --out data/p2/candidates.jsonl
+  python scripts/p2_sample.py --model qwen3-1.7b --system sft --n 8 --reward metricx24_qe
+  (writes data/p2/qwen3-1.7b/candidates.jsonl)
 """
 
 from __future__ import annotations
@@ -28,7 +28,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--system", default="sft")
     ap.add_argument("--prompts", default="data/p2/prompts.jsonl")
-    ap.add_argument("--out", default="data/p2/candidates.jsonl")
+    ap.add_argument("--model", default=None, help="policy model: qwen3-1.7b | gemma3-1b (sets the model id and per-model folders)")
+    ap.add_argument("--out", default=None, help="default: data/p2/<model>/candidates.jsonl")
     ap.add_argument("--n", type=int, default=8)
     ap.add_argument("--temperature", type=float, default=1.0)
     ap.add_argument("--top-p", type=float, default=1.0)
@@ -37,17 +38,19 @@ def main() -> None:
     ap.add_argument("--batch-size", type=int, default=64, help="sequences per generation batch")
     ap.add_argument("--max-new-tokens", type=int, default=256)
     ap.add_argument("--base-model", default=None)
-    ap.add_argument("--ckpt", default="ckpt")
+    ap.add_argument("--ckpt", default=None)
     ap.add_argument("--hub-repo", default=None,
                     help='private HF repo mirroring the adapters ("auto" = <user>/mtrlhf-en-de-adapters, "none" = off; default: $MTRLHF_HUB_REPO)')
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
-    from mtrlhf.models import DEFAULT_BASE, CheckpointStore, Translator, default_device
+    from mtrlhf.models import CheckpointStore, Translator, default_device, model_paths
     from mtrlhf.rewards import get_reward, reward_info
     from mtrlhf.rewards.guards import guard_flags
 
+    paths = model_paths(args.model)
+    args.out = args.out or os.path.join(paths["model_data"], "candidates.jsonl")
     prompts = read_jsonl(args.prompts)
     if args.limit:
         prompts = prompts[: args.limit]
@@ -57,8 +60,8 @@ def main() -> None:
     if not todo:
         return
 
-    store = CheckpointStore.from_env(args.ckpt, args.hub_repo)
-    tr = Translator.for_system(args.system, store, args.base_model or DEFAULT_BASE, device=default_device(0),
+    store = CheckpointStore.from_env(args.ckpt or paths["ckpt"], args.hub_repo, paths["hub_prefix"])
+    tr = Translator.for_system(args.system, store, args.base_model or paths["model_id"], device=default_device(0),
                                batch_size=args.batch_size, max_new_tokens=args.max_new_tokens)
     info = reward_info(args.reward)
     kw = {"device": default_device(1)} if info["kind"] == "metricx" else {}
