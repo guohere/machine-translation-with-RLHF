@@ -265,32 +265,31 @@ combined with the KL sweep.
 Differences between systems come with paired-bootstrap 95% CIs.
 
 ### 6.2 Over-optimization curves
-- **Best-of-N:** R_train and R_eval against N.
-- **GRPO:** R_train and R_eval against training step and against KL to S0, one curve per β.
+- **Best-of-k:** R_train and R_eval for k = 1, 2, 4, 8, from the 8 stored candidates per FLORES dev segment (the first k, the best by R_train).
+- **GRPO:** R_train and R_eval on FLORES dev at every saved checkpoint (every 125 steps; step 0 = SFT), up to twice the matched budget for the main model. The training logs add the reward, the guard rates and the KL per logged step. One β (0.02) is run; a β sweep is a stretch goal.
 
-If R_train keeps rising while R_eval peaks and then drops, the curve itself shows the reward being gamed.
+If R_train keeps rising while R_eval peaks and then drops, the curve itself shows the reward being gamed. The report also gives a single number per system, the **gap**: R_train gain minus R_eval gain over SFT, each in units of SFT's segment standard deviation.
 
 ### 6.3 Hacking diagnostics (cheap, rule-based, run on every output)
-- **Off-target language rate:** language ID on the output.
-- **Length-ratio distribution:** output length relative to the source, compared with the references.
-- **Source-copy rate:** character n-gram overlap with the source.
-- **Number mismatch rate:** digits in the source that are missing or changed in the output.
-- **Repetition rate:** repeated n-grams.
-- **Omission proxy:** low cross-lingual similarity (e.g. LaBSE) combined with a short length ratio.
+- **Wrong language:** language ID on the output (langid, confident and at least 4 words).
+- **Number mismatch:** a digit sequence of the source is missing from the output (separators ignored, so 1,000 = 1.000).
+- **Short / long:** output under 70% / over 140% of the reference length in characters (omission / addition proxies).
+- **Copy:** most character 4-grams of the output also occur in the source.
+- **Repetition:** some word 3-gram occurs three or more times.
 
 ### 6.4 Suspicious wins and predicted vs. observed exploits
-1. Find segments where **R_train(RL) − R_train(SFT) is large but R_eval(RL) < R_eval(SFT)**: the reward says better, the held-out metric says worse.
-2. Sample about 50 of them and label each with the probe categories from §4.2.
-3. Build the **predicted vs. observed** table: for each category, the Phase 1 detection rate of R_train next to its frequency among suspicious wins. If the low-detection categories dominate the suspicious wins, Phase 1 predicted the exploits, which confirms H3.
+1. **Suspicious wins:** segments where R_train(RL) − R_train(SFT) ≥ 1 MetricX point but R_eval(RL) − R_eval(SFT) ≤ −0.02 COMET: the training reward says better, the held-out metric says worse. Each is tagged automatically with the §6.3 signals the RL output introduced (present in RL, absent in SFT).
+2. **Predicted vs. observed:** for each Phase 1 probe category with an observable signal (number → number mismatch, wrong language, omission → short, addition → long, untranslated → copy, repetition), the share of probes R_train missed in Phase 1 next to the change in that signal's rate from SFT to GRPO, and its share among GRPO's suspicious wins. If the categories R_train misses most are the ones that grow, Phase 1 predicted the exploits, which confirms H3.
+3. The human audit (§6.5) decides how many suspicious wins are real exploits and how many are COMET-22 errors.
 
 ### 6.5 Human check
-- **A/B (unbiased win rate):** 60 random FLORES devtest segments. SFT and the best RL output are shown side by side in random order, with the source and reference visible. The annotator marks a preference (or a tie) and any major errors.
-- **Error audit:** the 50 suspicious-win segments from §6.4, labelled by error category.
-- **Agreement:** a native German speaker labels 30 of the A/B segments, and the report gives the agreement.
-- Guidelines and blinded sheets are kept in `human_eval/`.
+- **A/B (unbiased win rate):** 60 random FLORES devtest segments where the outputs differ. SFT and the best preference-tuned system (chosen on FLORES dev by COMET-22, so the test set does not pick it) are shown as A and B in random order, with the source and reference visible. The annotator marks A, B or tie. The report gives the win rate (ties count half) with a bootstrap CI and a sign test, and how often the preference agrees with the sign of the R_train and of the R_eval difference.
+- **Error audit:** up to 50 of GRPO's suspicious wins (§6.4), blinded the same way. The annotator marks the better translation and the main error of the worse one (omission, addition, mistranslation, number, named entity, wrong language, untranslated, grammar, repetition, other). RL worse = a real exploit of R_train; RL better = an R_eval error.
+- **Agreement (optional):** a native German speaker labels 30 of the A/B segments, and the report gives the agreement.
+- `scripts/p3_human_eval.py prepare` writes the sheets (CSV, any spreadsheet) and keeps the keys in separate files; `analyze` reads them back. Everything is in `results/p3/human_eval/<model>/`.
 
 ### 6.6 Forgetting check
-Evaluate S0 and every aligned system on FLORES devtest **de→en** (the reverse direction) and **en→zh** (an unrelated pair). Report chrF, COMET-22 and off-target rate. A drop shows that alignment on en→de damaged other abilities.
+Evaluate S0 and every aligned system on FLORES devtest **de→en** (the reverse direction) and **en→zh** (an unrelated pair). Report chrF, BLEU, COMET-22, off-target rate and copy rate. A drop shows that alignment on en→de damaged other abilities.
 
 ---
 
@@ -374,8 +373,9 @@ Evaluate S0 and every aligned system on FLORES devtest **de→en** (the reverse 
 | 2d | `python scripts/p2_train.py --config configs/p2/{rsft,dpo,grpo,grpo_guarded}.yaml` | `ckpt/{rsft,dpo,grpo,grpo_guarded}`, `ckpt/grpo-step<k>` |
 | 2e | `python scripts/p2_translate.py --systems … [--best-of 8]` | `results/p2/outputs/<system>/<testset>.jsonl`, `quick_eval.md` |
 | all of 2 | `python scripts/p2_run.py` (what the Kaggle notebook runs) | the next block of work from `configs/p2/run.yaml`, skipping what is saved |
-| 3a | `python scripts/p3_evaluate.py --systems all --testsets flores_devtest wmt24` | `reports/p3/method_benchmark.csv` |
-| 3b | `python scripts/p3_hacking_report.py` | `reports/p3/exploits.md`, over-optimization plots |
+| 3a | `python scripts/p3_score.py --model <model>` (GPU) | missing `scores_<metric>` in every output file, R_eval for the best-of-8 candidates |
+| 3b | `python scripts/p3_analyze.py` | `results/p3/report.md`, `results.json`, figures, suspicious wins (3a and 3b also run at the end of every `p2_run.py`) |
+| 3c | `python scripts/p3_human_eval.py prepare / analyze --model <model>` | blinded sheets; win rate and audit in `results/p3/human_eval/<model>/summary.md` |
 | 4a | `python scripts/p4_transcribe.py --whisper tiny base small medium large-v3-turbo --testsets fleurs_en mustc_tst_common` | `data/asr/*.jsonl`, WER table |
 | 4b | `python scripts/p4_cascade_eval.py --systems all` | `reports/p4/robustness.csv`, latency table, curves |
 

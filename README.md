@@ -116,19 +116,21 @@ machine-translation-with-RLHF/
 ├── configs/p2/         # one YAML per Phase 2 system: sft, rsft, dpo, grpo, grpo_guarded, grpo_cometkiwi
 ├── docs/               # proposal.md, workflow.md
 ├── notebooks/          # p1_reward_benchmark.ipynb, p2_training.ipynb (Kaggle / Colab)
-├── scripts/            # one CLI per pipeline step: p1_* (reward benchmark), p2_* (training, translation)
+├── scripts/            # one CLI per pipeline step: p1_* (reward benchmark), p2_* (training, translation),
+│                       #   p3_* (scores, analysis report, blinded human check)
 ├── src/mtrlhf/
 │   ├── rewards/        # one interface: score(src, hyp, ref=None) → higher is better
 │   │                   #   CometKiwi / COMET-22, MetricX-24, chrF / BLEU; guards.py = rule-based exploit checks
 │   ├── meta_eval/      # mt-metrics-eval loader, agreement statistics, blind-spot probes, report
 │   ├── data/           # prompt template, News Commentary training data, FLORES-200 / WMT24 test sets
 │   ├── train/          # SFT / RSFT, DPO, GRPO on TRL + LoRA; GRPO reward functions
-│   └── models.py       # systems as LoRA adapter chains, Hub-mirrored checkpoint store, batched generation
-├── tests/              # unit tests + end-to-end runs of Phase 1 and Phase 2 on tiny fake data (CPU)
+│   ├── models.py       # systems as LoRA adapter chains, Hub-mirrored checkpoint store, batched generation
+│   └── evaluation.py   # Phase 3: paired bootstrap, exploit signals, suspicious wins, curves, figures
+├── tests/              # unit tests + end-to-end runs of Phases 1–3 on tiny fake data (CPU)
 └── results/            # finished results, one folder per phase
 ```
 
-Planned for later phases: Phase 3 analysis scripts, `src/mtrlhf/speech/` and `human_eval/` (see [workflow](docs/workflow.md)).
+Planned for Phase 4: `src/mtrlhf/speech/` (see [workflow](docs/workflow.md)).
 
 ## Running Phase 1
 
@@ -180,13 +182,33 @@ python scripts/p2_translate.py --model $M --summary-only --score chrf metricx24_
 
 Add `--debug` to `p2_train.py` for a few-step run with the real model and a separate checkpoint folder. Every Phase 2 script takes `--model qwen3-1.7b | gemma3-1b`, which selects the model, its per-model folders (`ckpt/<model>/`, `results/p2/<model>/`) and its batch sizes. Gemma runs in fp32 on a T4, because it overflows in fp16.
 
-## Later phases (target interface)
+## Running Phase 3
+
+**On Kaggle nothing extra is needed.** At the end of every run, `p2_run.py` fills in the scores Phase 3 needs and rebuilds the report, so [`results/p3/report.md`](results/p3/report.md) grows as the Phase 2 results come in. Once every model is finished, one more "Save & Run All" does a final scoring pass and rebuild.
+
+**By hand:**
 
 ```bash
-# Phase 3: evaluation and hacking report
-python scripts/p3_evaluate.py --systems all --testsets flores_devtest wmt24
-python scripts/p3_hacking_report.py
+python scripts/p3_score.py --model qwen3-1.7b     # GPU: missing scores, and COMET-22 for the best-of-8 candidates
+python scripts/p3_analyze.py                      # CPU: results/p3/report.md, results.json, figures
 ```
+
+The report has one section per question. **A:** methods vs. SFT on the held-out metric, with paired-bootstrap CIs. **B:** over-optimization (GRPO checkpoints, best-of-k, training logs). **C:** exploit rates and *suspicious wins*, where the training reward says better and COMET-22 says worse. **D:** predicted vs. observed (Phase 1 blind spots against the exploits that occur). **E:** do the guards help? **F:** forgetting on de→en and en→zh. **G:** the human check. A final table checks whether the findings hold for both model families.
+
+**Human check (about 2 hours, CPU):**
+
+```bash
+python scripts/p3_human_eval.py prepare --model qwen3-1.7b   # blinded sheets in results/p3/human_eval/qwen3-1.7b/
+```
+
+Fill in `ab_sheet.csv` (60 segments: which is better, A or B?) and `audit_sheet.csv` (up to 50 suspicious wins: which is better, and what is wrong with the worse one?) in any spreadsheet. The `README.md` next to the sheets explains the job. Then:
+
+```bash
+python scripts/p3_human_eval.py analyze --model qwen3-1.7b   # win rate with CI; how many suspicious wins are real exploits
+python scripts/p3_analyze.py                                 # adds section G to the report
+```
+
+## Later phases (target interface)
 
 ```bash
 # Phase 4: speech cascade
@@ -201,7 +223,8 @@ python scripts/p4_cascade_eval.py --systems all
 - [x] **M2a/M3a** Phase 2 code: data pipeline, SFT, sampling and scoring, best-of-N, RSFT, DPO, Kaggle notebook, tests
 - [ ] **M2b/M3b** Phase 2 Part A run → `sft`, `sft+bo8`, `rsft`, `dpo` ← *minimum viable project*
 - [ ] **M4** GRPO and guarded GRPO (code ready, run = Part B), KL sweep, over-optimization curves → benchmark B
-- [ ] **M5** Hacking diagnostics, predicted vs. observed exploits, human check, forgetting check
+- [x] **M5a** Phase 3 code: held-out evaluation with paired bootstrap, exploit signals, suspicious wins, over-optimization curves, predicted vs. observed, forgetting, blinded human check; runs at the end of every Phase 2 run
+- [ ] **M5b** Phase 3 results: report on both models, human check
 - [ ] **M6** Whisper sweep, cascade evaluation, latency → benchmark C; final write-up
 - [ ] *Stretch:* CPO · MBR · cross-reward GRPO (2×2) · noise-aware GRPO on ASR transcripts
 

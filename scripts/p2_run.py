@@ -8,7 +8,7 @@ skips it; a failed step pushes its log to GitHub and stops the run.
 
 Order for a model: data -> (smoke test) -> Part A: sft, sampling pilot, samples,
 pairs, rsft + dpo, translations -> Part B: grpo + grpo_guarded, translations ->
-quick evaluation. With part=auto, Part B starts only in a run where Part A had
+quick evaluation -> Phase 3 scores and report (results/p3/). With part=auto, Part B starts only in a run where Part A had
 nothing left to do, so each part gets a full 12-hour Kaggle session.
 
 Examples:
@@ -157,6 +157,24 @@ def part_b(r, plan: dict) -> None:
         r.save(f"Phase 2 ({m}): translations ({run})")
 
 
+def phase3(runners: list, plan: dict) -> None:
+    """Fill in the scores Phase 3 needs and refresh results/p3/report.md.
+
+    Runs at the end of every run, so the analysis grows with the results. It never
+    stops Phase 2: a failure here is reported and the run carries on.
+    """
+    from mtrlhf.pipeline import StepFailed
+
+    try:
+        for r in runners:
+            r.sh(f"python scripts/p3_score.py --model {r.model} --metrics {' '.join(plan['quick_scores'])} "
+                 f"--bon-testsets {plan['dev_set']}", "p3_score")
+        runners[0].sh(f"python scripts/p3_analyze.py --models {' '.join(plan['models'])}", "p3_analyze")
+        runners[0].save("Phase 3: analysis updated")
+    except StepFailed as e:
+        print(f"Phase 3 analysis skipped ({e}). Phase 2 results are saved; this does not affect them.", flush=True)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--plan", default="configs/p2/run.yaml")
@@ -179,7 +197,10 @@ def main() -> None:
     if model == "auto":
         model = next((m for m in plan["models"] if not model_finished(runner(m), plan)), None)
         if model is None:
-            print("All planned models are finished. Next: Phase 3 analysis.")
+            print("All planned models are finished. Phase 3: scoring and analysis.", flush=True)
+            phase3([runner(m) for m in plan["models"]], plan)
+            print(f"\nPhase 2 is complete; the analysis is in results/p3/report.md. Next: the human check "
+                  f"(python scripts/p3_human_eval.py prepare --model {plan['models'][0]}).", flush=True)
             return
     r = runner(model)
     print(f"=== Phase 2 run: model {model} ({r.P['model_id']}), plan part={plan['part']}, "
@@ -206,6 +227,7 @@ def main() -> None:
         r.sh(f"python scripts/p2_translate.py --model {model} --summary-only --score {' '.join(plan['quick_scores'])}",
              "quick_eval")
         r.save(f"Phase 2 ({model}): quick evaluation")
+        phase3([r], plan)
     except StepFailed as e:
         print(f"\nSTOPPED: {e}", flush=True)
         sys.exit(1)

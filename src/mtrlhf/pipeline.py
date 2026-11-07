@@ -4,7 +4,7 @@ Everything the Kaggle notebook used to do in its cells lives here, so the notebo
 can stay a fixed launcher and changes arrive with `git pull`:
   * sh / run_jobs: run commands (two at a time on two GPUs), stream the output, keep a
     log per step in results/p2/<model>/logs/, and stop at the first failure;
-  * save: push results/p2/ to the branch after each step (needs GH_TOKEN);
+  * save: push results/p2/ and results/p3/ to the branch after each step (needs GH_TOKEN);
   * checks for what is already done, so every run continues where the last stopped.
 """
 
@@ -136,7 +136,7 @@ class Runner:
         self.collect()
         if not self.gh_token:
             return
-        self._git("add", "results/p2")
+        self._git("add", *[d for d in ("results/p2", "results/p3") if os.path.exists(os.path.join(self.root, d))])
         if self._git("diff", "--cached", "--quiet")[0] != 0:
             code, out = self._git("commit", "-q", "-m", message)
             if code:

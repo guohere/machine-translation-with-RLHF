@@ -68,14 +68,15 @@ def test_fresh_start_runs_part_a_only(tmp_path):
     steps, out = dry_run(tmp_path)
     assert "model qwen3-1.7b" in out
     assert steps == ["prepare_data", "smoke_sft", "smoke_sample", "smoke_grpo", "smoke_translate", "sft",
-                     "sampling_pilot", "sample", "pairs", "rsft", "dpo", "translate_A", "translate_bo8", "quick_eval"]
+                     "sampling_pilot", "sample", "pairs", "rsft", "dpo", "translate_A", "translate_bo8", "quick_eval",
+                     "p3_score", "p3_analyze"]
     assert "Part B (GRPO) starts in the next run" in out
 
 
 def test_part_b_runs_once_part_a_has_nothing_left(tmp_path):
     part_a_done(tmp_path)
     steps, out = dry_run(tmp_path)
-    assert steps == ["grpo", "grpo_guarded", "quick_eval"] and "Part A complete." in out
+    assert steps == ["grpo", "grpo_guarded", "quick_eval", "p3_score", "p3_analyze"] and "Part A complete." in out
     assert "sampling for every method and model: temperature 0.8, top-p 1.0" in out
 
 
@@ -95,7 +96,8 @@ def test_current_kaggle_state_resamples_and_retrains(tmp_path):
         adapter(tmp_path, "qwen3-1.7b", name)
     outputs(tmp_path, "qwen3-1.7b", "base")
     steps, out = dry_run(tmp_path)
-    assert steps == ["sampling_pilot", "sample", "pairs", "rsft", "dpo", "translate_A", "translate_bo8", "quick_eval"]
+    assert steps == ["sampling_pilot", "sample", "pairs", "rsft", "dpo", "translate_A", "translate_bo8", "quick_eval",
+                     "p3_score", "p3_analyze"]
     assert "sampling: chosen by the pilot in this run" in out
     assert "--systems opus-mt sft rsft dpo " in out  # base is complete already
 
@@ -115,7 +117,8 @@ def test_everything_finished(tmp_path):
         part_a_done(tmp_path, m)
         part_b_done(tmp_path, m)
     steps, out = dry_run(tmp_path)
-    assert steps == [] and "All planned models are finished" in out
+    assert steps == ["p3_score", "p3_score", "p3_analyze"] and "All planned models are finished" in out
+    assert "--models qwen3-1.7b gemma3-1b" in out and "p3_human_eval.py prepare" in out
 
 
 def test_explicit_overrides(tmp_path):
