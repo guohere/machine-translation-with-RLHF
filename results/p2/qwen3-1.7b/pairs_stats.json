@@ -1,8 +1,8 @@
 {
-  "prompts": 0,
-  "rsft": 0,
-  "dpo_pairs": 0,
-  "dpo_margin_mean": null,
+  "prompts": 5000,
+  "rsft": 4702,
+  "dpo_pairs": 4984,
+  "dpo_margin_mean": 13.432878682811744,
   "rsft_min_score": -5.0,
   "dpo_margin": 1.0
 }
