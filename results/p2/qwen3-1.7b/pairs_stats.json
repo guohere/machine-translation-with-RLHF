@@ -1,0 +1,28 @@
+{
+  "prompts": 5000,
+  "rsft": 4989,
+  "dpo_pairs": 4765,
+  "dpo_margin_mean": 6.042294087139831,
+  "rsft_min_score": -5.0,
+  "dpo_margin": 1.0,
+  "sampling": {
+    "system": "sft",
+    "n": 8,
+    "temperature": 0.8,
+    "top_p": 1.0,
+    "reward": "metricx24_qe",
+    "seed": 0,
+    "sft_recipe": "both-directions-v2"
+  },
+  "candidates": {
+    "groups": 5000,
+    "samples": 40000,
+    "broken_pct": 2.74,
+    "mean_score": -2.6913851296991202,
+    "mean_best": -0.8048083958420627,
+    "mean_worst": -6.591765904581547,
+    "spread": 1.9037026196251408,
+    "identical_groups_pct": 0.02,
+    "unique_per_group": 7.9504
+  }
+}
