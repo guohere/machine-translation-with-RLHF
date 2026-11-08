@@ -62,10 +62,26 @@ def part_a_done(cwd, model="qwen3-1.7b", rsft_sampling=None):
     write(f"{cwd}/results/p2/{model}/diagnostics/direction.json", {"results": []})
 
 
-def part_b_done(cwd, model="qwen3-1.7b"):
+def part_b_done(cwd, model="qwen3-1.7b", sweep=True):
     for run in ("grpo", "grpo_guarded"):
         adapter(cwd, model, f"{run}-step625")
         outputs(cwd, model, f"{run}-step625")
+    if sweep and model == "qwen3-1.7b":  # the DPO epoch sweep runs for the main model only
+        for k in (1, 2, 3):
+            adapter(cwd, model, f"dpo_sweep-ep{k}")
+            outputs(cwd, model, f"dpo_sweep-ep{k}", ["flores_dev.en-de", "flores_devtest.en-de", "wmt24.en-de"])
+
+
+def test_dpo_epoch_sweep_runs_after_grpo_for_the_main_model(tmp_path):
+    """The next Qwen run after GRPO: train the sweep (pairs first: data/ is gone), translate it, then Gemma."""
+    part_a_done(tmp_path)
+    part_b_done(tmp_path, sweep=False)
+    steps, out = dry_run(tmp_path)
+    assert "model qwen3-1.7b" in out
+    assert steps == ["pairs", "dpo_sweep", "translate_dpo_sweep", "quick_eval", "p3_score", "p3_analyze"], out
+    assert "--systems dpo_sweep-ep1 dpo_sweep-ep2 dpo_sweep-ep3 --testsets flores_dev.en-de" in out
+    steps, _ = dry_run(tmp_path, "dpo_epoch_sweep=[]")
+    assert "model gemma3-1b" in _ and "dpo_sweep" not in steps
 
 
 def test_fresh_start_runs_part_a_only(tmp_path):

@@ -133,10 +133,24 @@ def train_dpo(cfg: dict, store: CheckpointStore) -> str:
     train = Dataset.from_list([example(r) for r in _rows(cfg["data"], cfg["limit"])])
     model, tok, base = load_causal(cfg["parent"], store, cfg["base_model"])
     out_dir = os.path.join(cfg["out_root"], cfg["name"])
+    per_epoch = bool(cfg.get("save_epochs"))  # epoch sweep: keep an adapter after every epoch
     args = DPOConfig(**common_args(cfg, out_dir, base), beta=cfg.get("beta", 0.1), max_length=cfg["max_length"],
-                     save_strategy="no")
+                     save_strategy="epoch" if per_epoch else "no", save_only_model=per_epoch)
+    callbacks = []
+    if per_epoch:
+        from transformers import TrainerCallback
+
+        class ExportEpochs(TrainerCallback):
+            def on_save(self, a, state, control, **kw):
+                ckpt = os.path.join(a.output_dir, f"checkpoint-{state.global_step}")
+                if os.path.isdir(ckpt):
+                    store.save(f"{cfg['name']}-ep{round(state.epoch)}", ckpt, base, cfg["parent"],
+                               extra={"method": "dpo", "epoch": round(state.epoch), "step": state.global_step,
+                                      "epochs_planned": cfg["epochs"], "data_sampling": cfg.get("data_sampling")})
+
+        callbacks.append(ExportEpochs())
     trainer = DPOTrainer(model=model, args=args, train_dataset=train, processing_class=tok,
-                         peft_config=lora_config(cfg))
+                         peft_config=lora_config(cfg), callbacks=callbacks)
     trainer.train()
     return _finish(trainer, cfg, store, base, out_dir, {"n_pairs": len(train), "beta": args.beta})
 

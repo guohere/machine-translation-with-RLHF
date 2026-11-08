@@ -1,0 +1,16 @@
+# DPO epoch sweep: the same data and settings as dpo.yaml, trained for 3 epochs with an
+# adapter kept after every epoch (dpo_sweep-ep1, -ep2, -ep3). Does more DPO help on the held-out
+# metric, or only on the training reward? Pick on FLORES dev, report on devtest.
+# Note: the learning rate follows one cosine schedule over all 3 epochs, so ep1 is not the
+# same model as `dpo` (1 epoch, schedule finished).
+name: dpo_sweep
+method: dpo
+parent: sft
+data: "{model_data}/dpo_pairs.jsonl"
+beta: 0.1
+epochs: 3
+learning_rate: 2.0e-5
+batch_size: 8
+grad_accum: 4
+max_length: 384
+save_epochs: true

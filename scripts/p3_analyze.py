@@ -138,6 +138,25 @@ def model_section(model: str, outputs: dict, logs: dict, detection: dict, out_di
                        + f" ({', '.join(x['introduced'])})  ", f"> SRC {x['src'][:180]}  ",
                        f"> SFT {x['sft'][:180]}  ", f"> {ev.name(system).upper()} {x['system'][:180]}", ""]
 
+    # A3 · DPO epochs (configs/p2/dpo_sweep.yaml)
+    sweep = [r for r in prim if r["system"] in ["dpo", *ev.DPO_SWEEP]]
+    if any(r["system"] in ev.DPO_SWEEP for r in sweep):
+        rows = []
+        for r in sweep:
+            dev = ev.scores(outputs[r["system"]].get(DEV, []), ev.HELD_OUT)
+            dh, dt = r[f"delta_{ev.HELD_OUT}"], r[f"delta_{ev.TRAIN}"]
+            rows.append([ev.name(r["system"]), f(ev.mean(dev)) if dev else "–", delta_cell(dh), delta_cell(dt, 2),
+                         f(r["tails"]["bands"]["poor"], 1) if r.get("tails") else "–",
+                         f(r["shift"]["better_pct"], 1) if r.get("shift") else "–",
+                         f(r["shift"]["worse_pct"], 1) if r.get("shift") else "–"])
+        data["dpo_sweep"] = [r["system"] for r in sweep]
+        md += ["### A3 · Does more DPO help?", "",
+               "The same pairs, trained for 3 epochs with an adapter after each (one cosine schedule over all three, "
+               "so epoch 1 is not the 1-epoch `dpo`). Choose the epoch on FLORES dev (first column); the rest is "
+               f"{PRIMARY}.", ""]
+        md += [table(["System", f"COMET-22 on {DEV}", "COMET-22 Δ vs SFT", "MetricX-QE Δ vs SFT", "Poor %",
+                      "Better than SFT %", "Worse than SFT %"], rows), ""]
+
     # B · over-optimization
     curves = {ev.name(run): ev.checkpoint_curve(outputs, run, DEV)
               for run in ("grpo", "grpo_guarded", "grpo_cometkiwi")}

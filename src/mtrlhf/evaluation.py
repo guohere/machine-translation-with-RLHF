@@ -26,10 +26,12 @@ from mtrlhf.rewards import guards
 TRAIN = "metricx24_qe"
 HELD_OUT = "comet22"
 BUDGET_STEP = 625
-SYSTEM_ORDER = ["base", "opus-mt", "sft", "sft+bo8", "rsft", "dpo", "grpo-step625", "grpo_guarded-step625",
+DPO_SWEEP = ["dpo_sweep-ep1", "dpo_sweep-ep2", "dpo_sweep-ep3"]
+SYSTEM_ORDER = ["base", "opus-mt", "sft", "sft+bo8", "rsft", "dpo", *DPO_SWEEP, "grpo-step625", "grpo_guarded-step625",
                 "grpo_cometkiwi-step625"]
-RL_SYSTEMS = ["sft+bo8", "rsft", "dpo", "grpo-step625", "grpo_guarded-step625", "grpo_cometkiwi-step625"]
-DISPLAY = {"grpo-step625": "grpo", "grpo_guarded-step625": "grpo_guarded", "grpo_cometkiwi-step625": "grpo_cometkiwi"}
+RL_SYSTEMS = ["sft+bo8", "rsft", "dpo", *DPO_SWEEP, "grpo-step625", "grpo_guarded-step625", "grpo_cometkiwi-step625"]
+DISPLAY = {"dpo_sweep-ep1": "dpo 1/3 ep", "dpo_sweep-ep2": "dpo 2/3 ep", "dpo_sweep-ep3": "dpo 3/3 ep",
+           "grpo-step625": "grpo", "grpo_guarded-step625": "grpo_guarded", "grpo_cometkiwi-step625": "grpo_cometkiwi"}
 COST = {"sft+bo8": "8 samples + 8 reward calls"}
 
 # Phase 1 probe category -> the observable signal in real outputs that it predicts

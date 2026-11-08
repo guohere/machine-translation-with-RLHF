@@ -141,3 +141,17 @@ def test_direction_diagnostic(setup):
     assert [r["scale"] for r in res[:5]] == [None, 0.25, 0.5, 0.75, 1.0] and len(res) == 12
     assert all(r["n"] == 3 and 0 <= r["target_lang_pct"] <= 100 for r in res)
     assert "| de→en, adapter off |" in open(out / "direction.md").read() and "chrF" in log
+
+
+def test_dpo_epoch_sweep_keeps_an_adapter_per_epoch(setup):
+    """Runs after the end-to-end test (needs its sft adapter and DPO pairs)."""
+    s = setup
+    d = s["data"]
+    train(s, "configs/p2/dpo_sweep.yaml", f"data={d}/dpo_pairs.jsonl", "max_steps=-1", "epochs=2")
+    for k in (1, 2):
+        meta = json.load(open(os.path.join(s["ckpt"], f"dpo_sweep-ep{k}", "mtrlhf_meta.json")))
+        assert meta["parent"] == "sft" and meta["epoch"] == k and meta["epochs_planned"] == 2
+    outs = str(s["tmp"] / "outputs_sweep")
+    run("scripts/p2_translate.py", "--systems", "dpo_sweep-ep1", "dpo_sweep-ep2", "--testsets", "flores_devtest.en-de",
+        "--data", str(d), "--out", outs, "--ckpt", s["ckpt"], "--base-model", s["base"], "--max-new-tokens", "8")
+    assert all(read_jsonl(os.path.join(outs, f"dpo_sweep-ep{k}", "flores_devtest.en-de.jsonl")) for k in (1, 2))

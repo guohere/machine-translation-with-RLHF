@@ -52,10 +52,38 @@ def grpo_runs(plan: dict) -> list[str]:
     return ["grpo", "grpo_guarded"] + (["grpo_cometkiwi"] if plan.get("grpo_cometkiwi") else [])
 
 
+SWEEP_SETS = ["flores_dev.en-de", "flores_devtest.en-de", "wmt24.en-de"]
+
+
+def sweep_systems(r, plan: dict) -> list[str]:
+    n = 3
+    return [f"dpo_sweep-ep{k}" for k in range(1, n + 1)] if r.model in (plan.get("dpo_epoch_sweep") or []) else []
+
+
 def model_finished(r, plan: dict) -> bool:
     budget = plan["budget_step"]
-    return all(r.have(f"{run}-step{budget}") and not r.missing_outputs(f"{run}-step{budget}", plan["test_sets"])
-               for run in grpo_runs(plan))
+    grpo_done = all(r.have(f"{run}-step{budget}") and not r.missing_outputs(f"{run}-step{budget}", plan["test_sets"])
+                    for run in grpo_runs(plan))
+    sweep_done = all(r.have(s) and not r.missing_outputs(s, SWEEP_SETS) for s in sweep_systems(r, plan))
+    return grpo_done and sweep_done
+
+
+def dpo_epoch_sweep(r, plan: dict) -> None:
+    """Extra after GRPO: DPO for 3 epochs, an adapter per epoch, translated for the held-out check."""
+    systems = sweep_systems(r, plan)
+    if not systems:
+        return
+    m = r.model
+    if not all(r.have(s) for s in systems):
+        if not os.path.exists(os.path.join(r.P["model_data"], "dpo_pairs.jsonl")):
+            r.sh(f"python scripts/p2_build_pairs.py --model {m}", "pairs")  # data/ does not survive a session
+        r.sh(f"python scripts/p2_train.py --model {m} --config configs/p2/dpo_sweep.yaml --force", "dpo_sweep")
+        r.save(f"Phase 2 ({m}): DPO epoch sweep")
+    todo = [s for s in systems if r.missing_outputs(s, SWEEP_SETS)]
+    if todo:
+        r.sh(f"python scripts/p2_translate.py --model {m} --systems {' '.join(todo)} --testsets {' '.join(SWEEP_SETS)}",
+             "translate_dpo_sweep")
+        r.save(f"Phase 2 ({m}): translations (DPO epoch sweep)")
 
 
 def smoke_test(r, plan: dict) -> None:
@@ -164,6 +192,7 @@ def part_a(r, plan: dict) -> None:
 
 def part_b(r, plan: dict) -> None:
     m, budget = r.model, plan["budget_step"]
+    before = len(r.ran)
     jobs = []
     for run in grpo_runs(plan):
         if r.have(run) or r.have(f"{run}-step{budget}"):
@@ -184,6 +213,10 @@ def part_b(r, plan: dict) -> None:
             r.sh(f"python scripts/p2_translate.py --model {m} --systems {' '.join(curve)} --testsets {plan['dev_set']}",
                  f"translate_{run}_curve")
         r.save(f"Phase 2 ({m}): translations ({run})")
+    if len(r.ran) == before:  # like Part A/B: extras start in a run where GRPO had nothing left to do
+        dpo_epoch_sweep(r, plan)
+    elif sweep_systems(r, plan):
+        print("DPO epoch sweep: starts in the next run.", flush=True)
 
 
 def phase3(runners: list, plan: dict) -> None:
