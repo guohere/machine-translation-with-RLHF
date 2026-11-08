@@ -10,11 +10,18 @@ COMET-22 never guided training (held out); MetricX-QE is the training reward. Δ
 
 | System | COMET-22 ↑ (held out) | Δ vs SFT | MetricX-QE ↑ (trained on) | Δ vs SFT | Gap (SD) | chrF | BLEU | Inference cost |
 |---|---|---|---|---|---|---|---|---|
-| base | – | – | – | – | – | 53.4 | 22.9 | 1× |
-| opus-mt | – | – | – | – | – | 63.6 | 36.1 | 1× |
-| sft | – | – | – | – | – | 54.2 | 24.5 | 1× |
-| rsft | – | – | – | – | – | 54.4 | 24.6 | 1× |
-| dpo | – | – | – | – | – | 56.7 | 25.5 | 1× |
+| base | 0.805 | -0.017 [-0.023, -0.012] * | -1.61 | -0.20 [-0.31, -0.10] * | +0.06 | 53.4 | 22.9 | 1× |
+| opus-mt | 0.847 | +0.025 [+0.019, +0.031] * | -1.28 | +0.13 [+0.02, +0.23] * | -0.19 | 63.6 | 36.1 | 1× |
+| sft | 0.822 | – | -1.41 | – | – | 54.2 | 24.5 | 1× |
+| sft+bo8 | 0.805 | -0.018 [-0.023, -0.013] * | -0.89 | +0.53 [+0.45, +0.60] * | +0.54 | 50.0 | 18.6 | 8 samples + 8 reward calls |
+| rsft | 0.828 | +0.005 [+0.002, +0.009] * | -1.33 | +0.08 [+0.03, +0.14] * | -0.00 | 54.4 | 24.6 | 1× |
+| dpo | 0.820 | -0.003 [-0.007, +0.002] | -1.35 | +0.07 [-0.02, +0.15] | +0.07 | 56.7 | 25.5 | 1× |
+
+wmt24.en-de (paragraph-level): base 0.734 (-0.016 [-0.022, -0.010] *); opus-mt 0.733 (-0.017 [-0.026, -0.007] *); sft 0.750; sft+bo8 0.711 (-0.039 [-0.046, -0.033] *); rsft 0.756 (+0.006 [+0.003, +0.010] *); dpo 0.740 (-0.010 [-0.016, -0.005] *).
+
+### B · Over-optimization
+
+Best-of-k on FLORES dev (chosen by the training reward): k=1: MetricX-QE -3.04 / COMET-22 0.720, k=2: MetricX-QE -1.76 / COMET-22 0.759, k=4: MetricX-QE -1.13 / COMET-22 0.790, k=8: MetricX-QE -0.83 / COMET-22 0.810.
 
 ### C · Exploits
 
@@ -25,8 +32,15 @@ Share of outputs with each signal (%). *short* / *long* = under 70% / over 140% 
 | base | 0.1 | 0.7 | 1.1 | 0.7 | 0.0 | 0.1 |
 | opus-mt | 0.1 | 1.4 | 0.6 | 0.3 | 0.1 | 0.0 |
 | sft | 0.0 | 1.4 | 2.1 | 1.1 | 0.0 | 0.0 |
+| sft+bo8 | 0.0 | 1.7 | 0.4 | 1.5 | 0.0 | 0.0 |
 | rsft | 0.1 | 1.5 | 1.8 | 0.6 | 0.0 | 0.1 |
 | dpo | 0.0 | 1.3 | 0.1 | 2.0 | 0.0 | 0.0 |
+
+**Suspicious wins** (training reward ≥ 1 point better than SFT, COMET-22 ≥ 0.02 worse), with the signals the RL output introduced:
+
+- sft+bo8: 63 of 1012 segments — other 59, number_mismatch 2, long 2
+- rsft: 6 of 1012 segments — other 6
+- dpo: 23 of 1012 segments — other 22, long 1
 
 ### F · Forgetting on untrained directions
 
@@ -34,11 +48,13 @@ Training was English→German only. *Wrong language* = the output is not in the 
 
 | Test set | System | COMET-22 | chrF | BLEU | Wrong language % | Near copy % | Exact copy % |
 |---|---|---|---|---|---|---|---|
-| flores_devtest.de-en | base | – | 64.0 | 37.2 | 0.3 | 0.3 | 0.0 |
-| flores_devtest.de-en | sft | – | 25.1 | 2.6 | 98.9 | 96.7 | 41.5 |
-| flores_devtest.de-en | rsft | – | 24.9 | 2.4 | 99.3 | 96.7 | 35.3 |
-| flores_devtest.de-en | dpo | – | 24.7 | 2.3 | 100.0 | 94.6 | 13.1 |
-| flores_devtest.en-zh | base | – | 33.2 | 38.5 | 0.2 | 0.1 | 0.0 |
-| flores_devtest.en-zh | sft | – | 31.9 | 36.0 | 3.8 | 2.2 | 1.2 |
-| flores_devtest.en-zh | rsft | – | 32.4 | 36.4 | 3.3 | 1.6 | 0.9 |
-| flores_devtest.en-zh | dpo | – | 34.0 | 38.3 | 0.7 | 0.1 | 0.0 |
+| flores_devtest.de-en | base | 0.877 | 64.0 | 37.2 | 0.3 | 0.3 | 0.0 |
+| flores_devtest.de-en | sft | 0.751 | 25.1 | 2.6 | 98.9 | 96.7 | 41.5 |
+| flores_devtest.de-en | rsft | 0.750 | 24.9 | 2.4 | 99.3 | 96.7 | 35.3 |
+| flores_devtest.de-en | dpo | 0.739 | 24.7 | 2.3 | 100.0 | 94.6 | 13.1 |
+| flores_devtest.en-zh | base | 0.872 | 33.2 | 38.5 | 0.2 | 0.1 | 0.0 |
+| flores_devtest.en-zh | sft | 0.858 | 31.9 | 36.0 | 3.8 | 2.2 | 1.2 |
+| flores_devtest.en-zh | rsft | 0.861 | 32.4 | 36.4 | 3.3 | 1.6 | 0.9 |
+| flores_devtest.en-zh | dpo | 0.866 | 34.0 | 38.3 | 0.7 | 0.1 | 0.0 |
+
+Why: see the direction diagnostic in `results/p2/qwen3-1.7b/diagnostics/direction.md`.
