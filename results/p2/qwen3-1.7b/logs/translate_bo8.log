@@ -1,0 +1,15 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794151070.151257     796 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+best-of-8 sampling: temperature 0.8, top-p 1.0 (sampling pilot (results/p2/sampling.json))
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:02<00:02,  2.10s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.08s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.24s/it]
+You are using the default legacy behaviour of the <class 'transformers.models.t5.tokenization_t5.T5Tokenizer'>. This is expected, and simply means that the `legacy` (previous) behavior will be used so nothing changes for you. If you want to use the new behaviour, set `legacy=False`. This should only be set if you understand what it means, and thoroughly read the reason why this was added as explained in https://github.com/huggingface/transformers/pull/24565
+/usr/local/lib/python3.13/dist-packages/transformers/convert_slow_tokenizer.py:566: UserWarning: The sentencepiece tokenizer that you are converting to a fast tokenizer uses the byte fallback option which is not implemented in the fast tokenizers. In practice this means that the fast version of the tokenizer can produce unknown tokens whereas the sentencepiece version would have converted these unknown tokens into a sequence of byte tokens matching the original piece of text.
+  warnings.warn(
+(compat: PEFT rejects the installed torchao version; torchao is not used here, so it is ignored)
+sft+bo8 / flores_devtest.en-de: 1012 translations -> results/p2/qwen3-1.7b/outputs/sft+bo8/flores_devtest.en-de.jsonl
+sft+bo8 / wmt24.en-de: 998 translations -> results/p2/qwen3-1.7b/outputs/sft+bo8/wmt24.en-de.jsonl
+sft+bo8 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/sft+bo8/flores_dev.en-de.jsonl
