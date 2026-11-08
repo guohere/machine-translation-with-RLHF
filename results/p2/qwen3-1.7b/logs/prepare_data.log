@@ -1,0 +1,6 @@
+test set flores_dev.en-de: 997 segments
+test set flores_devtest.en-de: 1012 segments
+test set flores_devtest.de-en: 1012 segments
+test set flores_devtest.en-zh: 1012 segments
+test set wmt24.en-de: 998 segments
+training data: {'raw': 449333, 'dropped_filters': 2221, 'dropped_duplicate': 9, 'dropped_test_overlap': 0, 'dropped_language': 73, 'n_sft_train': 30000, 'n_sft_val': 500, 'n_prompts': 5000, 'n_sft_en_de': 20000, 'n_sft_de_en': 10000}

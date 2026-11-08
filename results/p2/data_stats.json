@@ -1,12 +1,14 @@
 {
   "raw": 449333,
-  "dropped_filters": 1619,
-  "dropped_duplicate": 1,
+  "dropped_filters": 2221,
+  "dropped_duplicate": 9,
   "dropped_test_overlap": 0,
-  "dropped_language": 50,
-  "n_sft_train": 20000,
+  "dropped_language": 73,
+  "n_sft_train": 30000,
   "n_sft_val": 500,
   "n_prompts": 5000,
+  "n_sft_en_de": 20000,
+  "n_sft_de_en": 10000,
   "source": "news-commentary-v18.de-en.tsv.gz",
   "seed": 13,
   "testsets": {
