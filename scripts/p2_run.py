@@ -40,6 +40,14 @@ def load_plan(path: str, sets: list[str]) -> dict:
     return plan
 
 
+def sft_recipe() -> str | None:
+    """The SFT recipe in configs/p2/sft.yaml; an adapter trained with another one is retrained."""
+    import yaml
+
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "configs", "p2", "sft.yaml")) as fh:
+        return yaml.safe_load(fh).get("recipe")
+
+
 def grpo_runs(plan: dict) -> list[str]:
     return ["grpo", "grpo_guarded"] + (["grpo_cometkiwi"] if plan.get("grpo_cometkiwi") else [])
 
@@ -78,9 +86,20 @@ def part_a(r, plan: dict) -> None:
 
     m, systems = r.model, r.P["systems"]
     sets = plan["test_sets"] + [plan["dev_set"]]
+    recipe = sft_recipe()
     if not r.have("sft"):
         r.sh(f"python scripts/p2_train.py --model {m} --config configs/p2/sft.yaml", "sft")
         r.save(f"Phase 2 ({m}): sft")
+    elif r.store.meta("sft").get("recipe") != recipe:
+        print(f"sft: trained with recipe {r.store.meta('sft').get('recipe')}, the plan uses {recipe}: retraining; "
+              "samples, rsft, dpo and their translations follow", flush=True)
+        for s in ("sft", "sft+bo8"):
+            r.drop_outputs(s)
+        diag = os.path.join(r.res, "diagnostics", "direction.json")
+        if os.path.exists(diag):
+            os.remove(diag)
+        r.sh(f"python scripts/p2_train.py --model {m} --config configs/p2/sft.yaml --force", "sft")
+        r.save(f"Phase 2 ({m}): sft ({recipe})")
     if load_sampling() is None:
         r.sh(f"python scripts/p2_sampling_pilot.py --model {m} --write results/p2/sampling.json", "sampling_pilot")
         r.save(f"Phase 2 ({m}): sampling pilot")
@@ -93,16 +112,19 @@ def part_a(r, plan: dict) -> None:
         print("sampling: chosen by the pilot in this run", flush=True)
     # what p2_sample.py records for samples drawn now (RSFT/DPO adapters must match it)
     expected = {"system": "sft", "n": plan["n_samples"], "temperature": chosen["temperature"],
-                "top_p": chosen["top_p"], "reward": plan["train_reward"], "seed": 0}
+                "top_p": chosen["top_p"], "reward": plan["train_reward"], "seed": 0, "sft_recipe": recipe}
 
     r.restore_candidates()
     n_prompts = len(read_jsonl("data/p2/prompts.jsonl"))
-    if not r.candidates_done(chosen, plan["n_samples"], plan["train_reward"], n_prompts):
+    sampled = not r.candidates_done(chosen, plan["n_samples"], plan["train_reward"], n_prompts, recipe)
+    if sampled:
         r.sh(f"python scripts/p2_sample.py --model {m} --system sft --n {plan['n_samples']} "
              f"--reward {plan['train_reward']} --on-mismatch restart", "sample")
         r.save(f"Phase 2 ({m}): sampled candidates")
     cand_meta = os.path.join(r.P["model_data"], "candidates.meta.json")
     current = json.load(open(cand_meta)) if os.path.exists(cand_meta) else None
+    if sampled and r.dry_run:  # a real run has just rewritten the file with the new settings
+        current = None
     data_sampling = current or expected
     retrain = [s for s in ("rsft", "dpo") if s in systems and r.needs_training(s, data_sampling)]
     # Pairs are only needed to (re)train RSFT/DPO. data/ does not survive a Kaggle session,

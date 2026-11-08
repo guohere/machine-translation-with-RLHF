@@ -81,15 +81,19 @@ def _rows(path: str, limit: int) -> list[dict]:
     return rows[:limit] if limit else rows
 
 
-def _messages(r: dict) -> list[dict]:
-    return build_messages(r["src"], r.get("src_lang", "en"), r.get("tgt_lang", "de"))
+def _messages(r: dict, variants: bool = False) -> list[dict]:
+    from mtrlhf.data.prompts import prompt_variant
+
+    v = prompt_variant(str(r.get("id", r["src"]))) if variants else 0
+    return build_messages(r["src"], r.get("src_lang", "en"), r.get("tgt_lang", "de"), v)
 
 
 def _finish(trainer, cfg: dict, store: CheckpointStore, base_model: str, out_dir: str, extra: dict) -> str:
     trainer.save_model(out_dir)
     write_json(os.path.join(out_dir, "log_history.json"), trainer.state.log_history)
     path = store.save(cfg["name"], out_dir, base_model, cfg["parent"] if cfg["parent"] != "base" else None,
-                      extra={"method": cfg["method"], "data_sampling": cfg.get("data_sampling"), **extra})
+                      extra={"method": cfg["method"], "data_sampling": cfg.get("data_sampling"),
+                             "recipe": cfg.get("recipe"), **extra})
     print(f"saved adapter '{cfg['name']}' -> {path}")
     return path
 
@@ -101,7 +105,8 @@ def train_sft(cfg: dict, store: CheckpointStore) -> str:
     from trl import SFTConfig, SFTTrainer
 
     def example(r):
-        return {"prompt": _messages(r), "completion": [{"role": "assistant", "content": r.get("tgt") or r["ref"]}]}
+        return {"prompt": _messages(r, cfg.get("prompt_variants", False)),
+                "completion": [{"role": "assistant", "content": r.get("tgt") or r["ref"]}]}
 
     train = Dataset.from_list([example(r) for r in _rows(cfg["data"], cfg["limit"])])
     model, tok, base = load_causal(cfg["parent"], store, cfg["base_model"])

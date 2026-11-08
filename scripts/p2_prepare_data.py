@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import random
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -32,6 +33,8 @@ def main() -> None:
     ap.add_argument("--sft-size", type=int, default=20000)
     ap.add_argument("--val-size", type=int, default=500)
     ap.add_argument("--prompt-size", type=int, default=5000)
+    ap.add_argument("--reverse-size", type=int, default=10000,
+                    help="extra German->English SFT pairs (disjoint from the rest); 0 = English->German only")
     ap.add_argument("--seed", type=int, default=13)
     ap.add_argument("--parallel-tsv", default=None, help="use this en-de TSV instead of downloading News Commentary")
     ap.add_argument("--flores-dir", default=None, help="where to cache the FLORES archive (default OUT/raw)")
@@ -63,10 +66,22 @@ def main() -> None:
     tsv = args.parallel_tsv or parallel.download_news_commentary(raw)
     pairs = parallel.read_tsv_pairs(tsv)
     splits, stats = parallel.make_splits(
-        pairs, {"sft_train": args.sft_size, "sft_val": args.val_size, "prompts": args.prompt_size},
+        pairs, {"sft_train": args.sft_size, "sft_val": args.val_size, "prompts": args.prompt_size,
+                **({"sft_reverse": args.reverse_size} if args.reverse_size else {})},
         exclude=exclude, seed=args.seed, check_language=not args.no_langid)
+    # SFT trains both directions: English->German (the task) plus German->English, so the model
+    # keeps reading which direction the instruction asks for (SFT on one direction only made
+    # Qwen3 answer every non-English input in its own language; results/p2/archive/).
+    fwd = [dict(r, src_lang="en", tgt_lang="de") for r in splits["sft_train"]]
+    rev = [{"id": r["id"], "src": r["ref"], "ref": r["src"], "src_lang": "de", "tgt_lang": "en"}
+           for r in splits.pop("sft_reverse", [])]
+    both = fwd + rev
+    random.Random(args.seed).shuffle(both)
+    splits["sft_train"] = both
     for name, rows in splits.items():
         write_jsonl(os.path.join(args.out, f"{name}.jsonl"), rows)
+    stats.update({"n_sft_train": len(both), "n_sft_en_de": len(fwd), "n_sft_de_en": len(rev)})
+    stats.pop("n_sft_reverse", None)
     stats.update({"source": os.path.basename(tsv), "seed": args.seed,
                   "testsets": {k: len(v) for k, v in sets.items()}})
     write_json(os.path.join(args.out, "data_stats.json"), stats)

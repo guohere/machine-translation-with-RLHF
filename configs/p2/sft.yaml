@@ -11,3 +11,7 @@ batch_size: 16
 grad_accum: 2
 max_length: 384
 lora: {r: 16, alpha: 32, dropout: 0.05}
+# v2: both directions (20k en->de + 10k de->en from p2_prepare_data) and 30% of prompts in
+# other wordings. v1 (en->de only, one fixed instruction) is archived in results/p2/archive/.
+recipe: both-directions-v2
+prompt_variants: true

@@ -203,7 +203,9 @@ def model_section(model: str, outputs: dict, logs: dict, detection: dict, out_di
     data["forgetting"] = fr
     if fr:
         md += ["### F · Forgetting on untrained directions", "",
-               "Training was English→German only. *Wrong language* = the output is not in the target language; "
+               "RSFT, DPO and GRPO train on English→German only; SFT (v2) also on German→English, so "
+               "German→English measures forgetting of a trained direction and English→Chinese an untrained one. "
+               "*Wrong language* = the output is not in the target language; "
                "*near copy* = most character 4-grams of the output occur in the source (includes rewrites of the "
                "source in its own language); *exact copy* = the output is the source, verbatim.", ""]
         md += [table(["Test set", "System", "COMET-22", "chrF", "BLEU", "Wrong language %", "Near copy %",

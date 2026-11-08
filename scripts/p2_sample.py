@@ -65,8 +65,10 @@ def main() -> None:
 
     # Never mix samples drawn with different settings in one file.
     meta_path = os.path.splitext(args.out)[0] + ".meta.json"
+    store = CheckpointStore.from_env(args.ckpt or paths["ckpt"], args.hub_repo, paths["hub_prefix"])
     meta = {"system": args.system, "n": args.n, "temperature": args.temperature, "top_p": args.top_p,
-            "reward": args.reward, "seed": args.seed}
+            "reward": args.reward, "seed": args.seed,
+            "sft_recipe": store.meta(args.system).get("recipe") if args.system != "base" else None}
     if read_jsonl(args.out):
         old = read_json(meta_path) if os.path.exists(meta_path) else None
         if old != meta:
@@ -82,7 +84,6 @@ def main() -> None:
     if not todo:
         return
 
-    store = CheckpointStore.from_env(args.ckpt or paths["ckpt"], args.hub_repo, paths["hub_prefix"])
     tr = Translator.for_system(args.system, store, args.base_model or paths["model_id"], device=default_device(0),
                                batch_size=args.batch_size, max_new_tokens=args.max_new_tokens)
     info = reward_info(args.reward)

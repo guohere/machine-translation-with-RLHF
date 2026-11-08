@@ -180,6 +180,8 @@ python scripts/p2_translate.py --model $M --systems sft --best-of 8
 python scripts/p2_translate.py --model $M --summary-only --score chrf metricx24_qe comet22
 ```
 
+SFT trains both directions: 20,000 English→German and 10,000 German→English pairs, with 30% of the prompts in other wordings (`configs/p2/sft.yaml`, recipe `both-directions-v2`). A first version trained on English→German only, with one fixed instruction, made the model repeat every non-English input instead of translating it; it is archived with its diagnosis in [`results/p2/archive/sft-v1-en-de-only/`](results/p2/archive/sft-v1-en-de-only/README.md). An SFT adapter trained with another recipe is retrained automatically, together with everything built on it.
+
 Part A ends with a direction diagnostic (`scripts/p2_diagnose_direction.py`, about 15 minutes): after SFT on English→German only, the model answers German→English requests in German, and the diagnostic tests whether that is a loading bug or learned behaviour. It switches the adapter off, scales it from 0 to 1, and tries other language pairs and prompt orders.
 
 Add `--debug` to `p2_train.py` for a few-step run with the real model and a separate checkpoint folder. Every Phase 2 script takes `--model qwen3-1.7b | gemma3-1b`, which selects the model, its per-model folders (`ckpt/<model>/`, `results/p2/<model>/`) and its batch sizes. Gemma runs in fp32 on a T4, because it overflows in fp16.

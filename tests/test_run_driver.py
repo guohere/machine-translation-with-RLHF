@@ -10,6 +10,7 @@ import pytest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SAMPLING = {"temperature": 0.8, "top_p": 1.0}
+RECIPE = "both-directions-v2"
 SETS = ["flores_devtest.en-de", "wmt24.en-de", "flores_devtest.de-en", "flores_devtest.en-zh", "flores_dev.en-de"]
 
 
@@ -33,6 +34,8 @@ def write(path, obj):
 
 
 def adapter(cwd, model, name, **meta):
+    if name == "sft":
+        meta.setdefault("recipe", RECIPE)
     write(f"{cwd}/ckpt/{model}/{name}/mtrlhf_meta.json", {"base_model": "x", "parent": None, **meta})
 
 
@@ -42,7 +45,7 @@ def outputs(cwd, model, system, sets=SETS):
 
 
 def part_a_done(cwd, model="qwen3-1.7b", rsft_sampling=None):
-    cand_meta = {"system": "sft", "n": 8, **SAMPLING, "reward": "metricx24_qe", "seed": 0}
+    cand_meta = {"system": "sft", "n": 8, **SAMPLING, "reward": "metricx24_qe", "seed": 0, "sft_recipe": RECIPE}
     write(f"{cwd}/data/p2/prompts.jsonl", [{"id": i} for i in range(3)])
     write(f"{cwd}/results/p2/sampling.json", SAMPLING)
     write(f"{cwd}/data/p2/{model}/candidates.jsonl", [{"id": i} for i in range(3)])
@@ -108,6 +111,27 @@ def test_next_kaggle_run_diagnoses_before_grpo(tmp_path):
     assert "Part B (GRPO) starts in the next run" in out
     steps, _ = dry_run(tmp_path, "diagnose_direction=false")
     assert steps[:2] == ["grpo", "grpo_guarded"]
+
+
+def test_sft_with_an_older_recipe_is_retrained_with_everything_built_on_it(tmp_path):
+    """The real state after the decision: v1 sft (en->de only), its samples, rsft, dpo, translations."""
+    part_a_done(tmp_path)
+    old = {"system": "sft", "n": 8, **SAMPLING, "reward": "metricx24_qe", "seed": 0}  # v1 samples: no sft_recipe
+    adapter(tmp_path, "qwen3-1.7b", "sft", recipe=None)
+    for s in ("rsft", "dpo"):
+        adapter(tmp_path, "qwen3-1.7b", s, data_sampling=old)
+    write(f"{tmp_path}/data/p2/qwen3-1.7b/candidates.meta.json", old)
+    write(f"{tmp_path}/data/p2/qwen3-1.7b/pairs_stats.json", {"sampling": old})
+    steps, out = dry_run(tmp_path)
+    assert steps == ["sft", "sample", "pairs", "rsft", "dpo", "translate_A", "translate_bo8", "diagnose_direction",
+                     "quick_eval", "p3_score", "p3_analyze"], out
+    assert "sft: trained with recipe None, the plan uses both-directions-v2: retraining" in out
+    assert "--systems sft rsft dpo " in out  # base and opus-mt do not depend on sft: kept
+    assert "Part B (GRPO) starts in the next run" in out
+    res = tmp_path / "results/p2/qwen3-1.7b"
+    assert not os.path.exists(res / "outputs/sft+bo8/flores_devtest.en-de.jsonl")
+    assert not os.path.exists(res / "diagnostics/direction.json")
+    assert os.path.exists(res / "outputs/base/flores_devtest.en-de.jsonl")
 
 
 def test_outdated_rsft_is_retrained_and_retranslated(tmp_path):

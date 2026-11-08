@@ -81,6 +81,31 @@ def test_make_splits_disjoint_deterministic_and_excludes_tests():
     assert stats["n_sft_train"] == 20 and stats["n_prompts"] == 10
 
 
+def test_reverse_split_leaves_existing_splits_unchanged():
+    """SFT v2 adds German->English pairs as a split cut last: the RL prompts must not move."""
+    pairs = [(f"This is English sentence number {i} for the test.", f"Das ist deutscher Satz Nummer {i} für den Test.")
+             for i in range(60)]
+    sizes = {"sft_train": 20, "sft_val": 5, "prompts": 10}
+    v1, _ = parallel.make_splits(pairs, sizes, seed=13, check_language=False)
+    v2, _ = parallel.make_splits(pairs, {**sizes, "sft_reverse": 15}, seed=13, check_language=False)
+    assert all(v1[k] == v2[k] for k in sizes)
+    used = {r["src"] for k in sizes for r in v1[k]}
+    assert len(v2["sft_reverse"]) == 15 and not used & {r["src"] for r in v2["sft_reverse"]}
+
+
+def test_prompt_variants_are_deterministic_and_mostly_the_inference_prompt():
+    from mtrlhf.data.prompts import build_messages, prompt_variant
+
+    ids = [f"sft_train-{i:05d}" for i in range(3000)]
+    v = [prompt_variant(i) for i in ids]
+    assert v == [prompt_variant(i) for i in ids]
+    assert 0.65 < v.count(0) / len(v) < 0.75 and v.count(1) > 300 and v.count(2) > 300
+    for k in (0, 1, 2):
+        text = build_messages("Hallo Welt.", "de", "en", k)[0]["content"]
+        assert "Hallo Welt." in text and "English" in text and "German" in text
+    assert build_messages("x", "de", "en")[0]["content"].startswith("Translate the following German text into English.")
+
+
 def test_flores_reader_from_local_archive(tmp_path):
     buf = tmp_path / "flores200_dataset.tar.gz"
     with tarfile.open(buf, "w:gz") as tar:

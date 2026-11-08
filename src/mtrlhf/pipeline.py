@@ -163,14 +163,14 @@ class Runner:
     def have(self, name: str) -> bool:
         return name in ("base", "opus-mt") or self.store.has(name)
 
-    def candidates_done(self, sampling: dict, n: int, reward: str, n_prompts: int) -> bool:
+    def candidates_done(self, sampling: dict, n: int, reward: str, n_prompts: int, sft_recipe=None) -> bool:
         md = self.P["model_data"]
         meta_path = f"{md}/candidates.meta.json"
         if not os.path.exists(meta_path):
             return False
         meta = read_json(meta_path)
-        same = (meta.get("temperature"), meta.get("top_p"), meta.get("n"), meta.get("reward")) == \
-               (sampling["temperature"], sampling["top_p"], n, reward)
+        same = (meta.get("temperature"), meta.get("top_p"), meta.get("n"), meta.get("reward"),
+                meta.get("sft_recipe")) == (sampling["temperature"], sampling["top_p"], n, reward, sft_recipe)
         return same and len(read_jsonl(f"{md}/candidates.jsonl")) >= n_prompts
 
     def pairs_sampling(self) -> dict | None:
