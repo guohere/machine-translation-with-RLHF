@@ -103,12 +103,14 @@ def part_a(r, plan: dict) -> None:
         r.save(f"Phase 2 ({m}): sampled candidates")
     cand_meta = os.path.join(r.P["model_data"], "candidates.meta.json")
     current = json.load(open(cand_meta)) if os.path.exists(cand_meta) else None
-    if r.pairs_sampling() != current or current is None:
+    data_sampling = current or expected
+    retrain = [s for s in ("rsft", "dpo") if s in systems and r.needs_training(s, data_sampling)]
+    # Pairs are only needed to (re)train RSFT/DPO. data/ does not survive a Kaggle session,
+    # so a fresh session has no pairs on disk; building them there anyway would count as
+    # Part A work and postpone Part B forever.
+    if retrain and (r.pairs_sampling() != current or current is None):
         r.sh(f"python scripts/p2_build_pairs.py --model {m}", "pairs")
         r.save(f"Phase 2 ({m}): preference pairs")
-
-    data_sampling = r.pairs_sampling() or expected
-    retrain = [s for s in ("rsft", "dpo") if s in systems and r.needs_training(s, data_sampling)]
     for s in retrain:
         if r.have(s):
             print(f"{s}: trained on samples from another sampling setting -> retraining and translating again")

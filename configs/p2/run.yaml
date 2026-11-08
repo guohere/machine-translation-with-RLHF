@@ -5,7 +5,8 @@
 
 models: [qwen3-1.7b, gemma3-1b]   # main model first, then the replication
 model: auto           # auto = the first model whose GRPO runs are not finished yet
-part: auto            # auto = finish Part A; Part B starts in a run where Part A had nothing left to do
+part: A               # HOLD: GRPO waits for the decision on retraining SFT (see diagnostics/direction.md)
+                      # auto = finish Part A; Part B starts in a run where Part A had nothing left to do
                       # (each part then gets a fresh 12-hour Kaggle session); or A | B | ALL
 smoke_test: auto      # auto = only for a model without a trained sft adapter (its first run); or true | false
 hub_repo: auto        # private Hugging Face repo for adapters (needs a write HF_TOKEN); none = session only

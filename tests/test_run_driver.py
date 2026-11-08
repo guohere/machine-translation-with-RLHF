@@ -16,7 +16,7 @@ SETS = ["flores_devtest.en-de", "wmt24.en-de", "flores_devtest.de-en", "flores_d
 def dry_run(cwd, *sets):
     env = {k: v for k, v in os.environ.items() if k not in ("MTRLHF_SAMPLING_FILE", "MTRLHF_HUB_REPO", "GH_TOKEN")}
     proc = subprocess.run([sys.executable, f"{ROOT}/scripts/p2_run.py", "--plan", f"{ROOT}/configs/p2/run.yaml",
-                           "--dry-run", "--set", "hub_repo=none", *sets],
+                           "--dry-run", "--set", "hub_repo=none", "part=auto", *sets],  # the logic, not today's hold
                           cwd=cwd, capture_output=True, text=True, env=env)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     steps = re.findall(r"^\[dry-run\] ([\w+.-]+):", proc.stdout, re.M)
@@ -79,6 +79,24 @@ def test_part_b_runs_once_part_a_has_nothing_left(tmp_path):
     steps, out = dry_run(tmp_path)
     assert steps == ["grpo", "grpo_guarded", "quick_eval", "p3_score", "p3_analyze"] and "Part A complete." in out
     assert "sampling for every method and model: temperature 0.8, top-p 1.0" in out
+
+
+def test_fresh_session_after_part_a_starts_grpo(tmp_path):
+    """A new Kaggle session: data/ is gone (only prompts are rebuilt), results/ and adapters are saved.
+    Nothing in Part A is left, so this run must be Part B, not a rebuild of the pairs."""
+    import gzip
+    import shutil
+
+    part_a_done(tmp_path)
+    md, res = tmp_path / "data/p2/qwen3-1.7b", tmp_path / "results/p2/qwen3-1.7b"
+    shutil.copy(md / "candidates.meta.json", res / "candidates.meta.json")
+    shutil.copy(md / "pairs_stats.json", res / "pairs_stats.json")
+    with open(md / "candidates.jsonl", "rb") as src, gzip.open(res / "candidates.jsonl.gz", "wb") as dst:
+        dst.write(src.read())
+    shutil.rmtree(md)
+    steps, out = dry_run(tmp_path)
+    assert steps == ["grpo", "grpo_guarded", "quick_eval", "p3_score", "p3_analyze"], out
+    assert "restored sampled candidates" in out and "Part A complete." in out
 
 
 def test_next_kaggle_run_diagnoses_before_grpo(tmp_path):
