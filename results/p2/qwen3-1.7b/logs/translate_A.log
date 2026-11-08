@@ -1,0 +1,33 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794148728.830082     745 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:02<00:02,  2.18s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.12s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.28s/it]
+(compat: PEFT rejects the installed torchao version; torchao is not used here, so it is ignored)
+sft / flores_devtest.en-de: 1012 translations -> results/p2/qwen3-1.7b/outputs/sft/flores_devtest.en-de.jsonl
+sft / wmt24.en-de: 998 translations -> results/p2/qwen3-1.7b/outputs/sft/wmt24.en-de.jsonl
+sft / flores_devtest.de-en: 1012 translations -> results/p2/qwen3-1.7b/outputs/sft/flores_devtest.de-en.jsonl
+sft / flores_devtest.en-zh: 1012 translations -> results/p2/qwen3-1.7b/outputs/sft/flores_devtest.en-zh.jsonl
+sft / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/sft/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.69s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.10it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.02s/it]
+rsft / flores_devtest.en-de: 1012 translations -> results/p2/qwen3-1.7b/outputs/rsft/flores_devtest.en-de.jsonl
+rsft / wmt24.en-de: 998 translations -> results/p2/qwen3-1.7b/outputs/rsft/wmt24.en-de.jsonl
+rsft / flores_devtest.de-en: 1012 translations -> results/p2/qwen3-1.7b/outputs/rsft/flores_devtest.de-en.jsonl
+rsft / flores_devtest.en-zh: 1012 translations -> results/p2/qwen3-1.7b/outputs/rsft/flores_devtest.en-zh.jsonl
+rsft / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/rsft/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.68s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.11it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.02s/it]
+dpo / flores_devtest.en-de: 1012 translations -> results/p2/qwen3-1.7b/outputs/dpo/flores_devtest.en-de.jsonl
+dpo / wmt24.en-de: 998 translations -> results/p2/qwen3-1.7b/outputs/dpo/wmt24.en-de.jsonl
+dpo / flores_devtest.de-en: 1012 translations -> results/p2/qwen3-1.7b/outputs/dpo/flores_devtest.de-en.jsonl
+dpo / flores_devtest.en-zh: 1012 translations -> results/p2/qwen3-1.7b/outputs/dpo/flores_devtest.en-zh.jsonl
+dpo / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/dpo/flores_dev.en-de.jsonl
