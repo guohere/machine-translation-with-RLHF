@@ -1,0 +1,188 @@
+{
+  "system": "sft",
+  "n": 100,
+  "results": [
+    {
+      "condition": "de→en, adapter off",
+      "src": "de",
+      "tgt": "en",
+      "scale": null,
+      "prompt": "standard",
+      "n": 100,
+      "target_lang_pct": 100.0,
+      "languages": {
+        "en": 100
+      },
+      "exact_copy_pct": 0.0,
+      "chrf": 63.906507497034625,
+      "same_as_stored_pct": 98.0,
+      "stored_system": "base"
+    },
+    {
+      "condition": "de→en, adapter ×0.25",
+      "src": "de",
+      "tgt": "en",
+      "scale": 0.25,
+      "prompt": "standard",
+      "n": 100,
+      "target_lang_pct": 98.0,
+      "languages": {
+        "en": 98,
+        "de": 2
+      },
+      "exact_copy_pct": 0.0,
+      "chrf": 63.815311482294526
+    },
+    {
+      "condition": "de→en, adapter ×0.5",
+      "src": "de",
+      "tgt": "en",
+      "scale": 0.5,
+      "prompt": "standard",
+      "n": 100,
+      "target_lang_pct": 65.0,
+      "languages": {
+        "en": 65,
+        "de": 35
+      },
+      "exact_copy_pct": 14.0,
+      "chrf": 49.33171808724231
+    },
+    {
+      "condition": "de→en, adapter ×0.75",
+      "src": "de",
+      "tgt": "en",
+      "scale": 0.75,
+      "prompt": "standard",
+      "n": 100,
+      "target_lang_pct": 13.0,
+      "languages": {
+        "de": 87,
+        "en": 13
+      },
+      "exact_copy_pct": 35.0,
+      "chrf": 31.261224054824876
+    },
+    {
+      "condition": "de→en, adapter ×1 (SFT)",
+      "src": "de",
+      "tgt": "en",
+      "scale": 1.0,
+      "prompt": "standard",
+      "n": 100,
+      "target_lang_pct": 2.0,
+      "languages": {
+        "de": 98,
+        "en": 2
+      },
+      "exact_copy_pct": 32.0,
+      "chrf": 27.902439945023538,
+      "same_as_stored_pct": 98.0,
+      "stored_system": "sft"
+    },
+    {
+      "condition": "de→en, SFT, instruction after the text",
+      "src": "de",
+      "tgt": "en",
+      "scale": 1.0,
+      "prompt": "after",
+      "n": 100,
+      "target_lang_pct": 37.0,
+      "languages": {
+        "de": 63,
+        "en": 37
+      },
+      "exact_copy_pct": 20.0,
+      "chrf": 38.395097760044386
+    },
+    {
+      "condition": "fr→en, adapter off",
+      "src": "fr",
+      "tgt": "en",
+      "scale": null,
+      "prompt": "standard",
+      "n": 100,
+      "target_lang_pct": 100.0,
+      "languages": {
+        "en": 100
+      },
+      "exact_copy_pct": 0.0,
+      "chrf": 64.89833030476538
+    },
+    {
+      "condition": "fr→en, SFT",
+      "src": "fr",
+      "tgt": "en",
+      "scale": 1.0,
+      "prompt": "standard",
+      "n": 100,
+      "target_lang_pct": 20.0,
+      "languages": {
+        "fr": 80,
+        "en": 20
+      },
+      "exact_copy_pct": 36.0,
+      "chrf": 36.59601925956162
+    },
+    {
+      "condition": "de→zh, adapter off",
+      "src": "de",
+      "tgt": "zh",
+      "scale": null,
+      "prompt": "standard",
+      "n": 100,
+      "target_lang_pct": 100.0,
+      "languages": {
+        "zh": 100
+      },
+      "exact_copy_pct": 0.0,
+      "chrf": 30.52778847966579
+    },
+    {
+      "condition": "de→zh, SFT",
+      "src": "de",
+      "tgt": "zh",
+      "scale": 1.0,
+      "prompt": "standard",
+      "n": 100,
+      "target_lang_pct": 5.0,
+      "languages": {
+        "de": 95,
+        "zh": 5
+      },
+      "exact_copy_pct": 32.0,
+      "chrf": 4.561740437954474
+    },
+    {
+      "condition": "en→zh, SFT (control)",
+      "src": "en",
+      "tgt": "zh",
+      "scale": 1.0,
+      "prompt": "standard",
+      "n": 100,
+      "target_lang_pct": 95.0,
+      "languages": {
+        "zh": 95,
+        "en": 3,
+        "de": 1,
+        "ja": 1
+      },
+      "exact_copy_pct": 1.0,
+      "chrf": 31.648354456466194
+    },
+    {
+      "condition": "fr→de, SFT (control)",
+      "src": "fr",
+      "tgt": "de",
+      "scale": 1.0,
+      "prompt": "standard",
+      "n": 100,
+      "target_lang_pct": 100.0,
+      "languages": {
+        "de": 100
+      },
+      "exact_copy_pct": 0.0,
+      "chrf": 48.367004784753796
+    }
+  ]
+}

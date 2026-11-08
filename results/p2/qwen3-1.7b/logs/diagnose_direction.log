@@ -1,0 +1,25 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794130232.484163     263 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+
+Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+Fetching 2 files:  50%|█████     | 1/2 [00:07<00:07,  7.17s/it]
+Fetching 2 files: 100%|██████████| 2/2 [00:07<00:00,  3.59s/it]
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:02<00:02,  2.09s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.08s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.23s/it]
+(compat: PEFT rejects the installed torchao version; torchao is not used here, so it is ignored)
+de→en, adapter off                         in en: 100.0%  exact copy:   0.0%  chrF  63.9  {'en': 100}  same as stored base: 98%
+de→en, adapter ×0.25                       in en:  98.0%  exact copy:   0.0%  chrF  63.8  {'en': 98, 'de': 2}
+de→en, adapter ×0.5                        in en:  65.0%  exact copy:  14.0%  chrF  49.3  {'en': 65, 'de': 35}
+de→en, adapter ×0.75                       in en:  13.0%  exact copy:  35.0%  chrF  31.3  {'de': 87, 'en': 13}
+de→en, adapter ×1 (SFT)                    in en:   2.0%  exact copy:  32.0%  chrF  27.9  {'de': 98, 'en': 2}  same as stored sft: 98%
+de→en, SFT, instruction after the text     in en:  37.0%  exact copy:  20.0%  chrF  38.4  {'de': 63, 'en': 37}
+fr→en, adapter off                         in en: 100.0%  exact copy:   0.0%  chrF  64.9  {'en': 100}
+fr→en, SFT                                 in en:  20.0%  exact copy:  36.0%  chrF  36.6  {'fr': 80, 'en': 20}
+de→zh, adapter off                         in zh: 100.0%  exact copy:   0.0%  chrF  30.5  {'zh': 100}
+de→zh, SFT                                 in zh:   5.0%  exact copy:  32.0%  chrF   4.6  {'de': 95, 'zh': 5}
+en→zh, SFT (control)                       in zh:  95.0%  exact copy:   1.0%  chrF  31.6  {'zh': 95, 'en': 3, 'de': 1, 'ja': 1}
+fr→de, SFT (control)                       in de: 100.0%  exact copy:   0.0%  chrF  48.4  {'de': 100}
+-> results/p2/qwen3-1.7b/diagnostics/direction.md
