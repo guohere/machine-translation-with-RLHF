@@ -126,6 +126,12 @@ def test_report_finds_the_planted_exploit(tree):
     grpo = prim["grpo-step625"]
     assert grpo["delta_metricx24_qe"]["lo"] > 0 and grpo["delta_comet22"]["hi"] < 0  # reward up, held-out down
     assert grpo["gap_sd"] > 0 and prim["dpo"]["delta_comet22"]["lo"] > 0
+    assert "### A2 ·" in report and grpo["shift"]["worse_pct"] == pytest.approx(100 * 15 / N)
+    assert prim["dpo"]["shift"]["worse_pct"] == 0 and prim["sft"]["shift"] is None
+    assert abs(sum(grpo["tails"]["bands"].values()) - 100) < 1e-9
+    worst = [json.loads(x) for x in open(tree / "p3" / f"{MODEL}_worst_regressions_grpo.jsonl")]
+    assert len(worst) == 20 and worst[0]["held_delta"] <= worst[-1]["held_delta"]
+    assert "number_mismatch" in worst[0]["introduced"]
     assert grpo["rates"]["number_mismatch"] == pytest.approx(100 * 15 / N)
     assert data["suspicious_wins"]["grpo-step625"] == 15 and data["suspicious_wins"]["dpo"] == 0
     wins = [json.loads(x) for x in open(tree / "p3" / f"{MODEL}_suspicious_wins_grpo.jsonl")]
@@ -144,7 +150,8 @@ def test_report_finds_the_planted_exploit(tree):
     assert fg[("flores_devtest.de-en", "sft")]["wrong_language"] == 100
     assert fg[("flores_devtest.de-en", "grpo-step625")]["wrong_language"] == 0
     assert data["guards_effect"]["delta_held_out"]["lo"] > 0
-    for fig in ("predicted_vs_observed.png", f"{MODEL}_overoptimization.png", f"{MODEL}_training.png"):
+    for fig in ("predicted_vs_observed.png", f"{MODEL}_overoptimization.png", f"{MODEL}_training.png",
+                f"{MODEL}_tails.png"):
         assert os.path.getsize(tree / "p3" / fig) > 10_000
     assert "gemma3-1b" not in report  # a model without outputs is skipped
 

@@ -101,6 +101,43 @@ def model_section(model: str, outputs: dict, logs: dict, detection: dict, out_di
             f"{ev.name(r['system'])} {f(r[ev.HELD_OUT])} ({delta_cell(r[f'delta_{ev.HELD_OUT}'])})"
             if r["system"] != "sft" else f"sft {f(r[ev.HELD_OUT])}" for r in sec) + ".", ""]
 
+    # A2 · beyond the average
+    if prim and any(ev.scores(outputs[r["system"]][PRIMARY], ev.HELD_OUT) for r in prim):
+        sft_rows = outputs["sft"][PRIMARY]
+        for r in prim:
+            r["tails"] = ev.tail_stats(outputs[r["system"]][PRIMARY])
+            r["shift"] = ev.paired_shift(outputs[r["system"]][PRIMARY], sft_rows) if r["system"] != "sft" else None
+        md += [f"### A2 · Beyond the average: the tails on {PRIMARY}", "",
+               "Mean differences hide where a method helps or hurts. Bands of COMET-22 per segment (% of segments), "
+               "the mean of the worst 10% of segments, and the share of segments that are clearly (≥ 0.05) better "
+               "or worse than SFT on the same sentence.", ""]
+        band_names = [b[0] for b in ev.BANDS]
+        md += [table(["System"] + [f"{b} %" for b in band_names] + ["Worst 10% mean", "Better than SFT %",
+                                                                      "Worse than SFT %"],
+                     [[ev.name(r["system"])] + [f(r["tails"]["bands"][b], 1) for b in band_names]
+                      + [f(r["tails"]["worst10_mean"]),
+                         f(r["shift"]["better_pct"], 1) if r["shift"] else "–",
+                         f(r["shift"]["worse_pct"], 1) if r["shift"] else "–"]
+                      for r in prim if r["tails"]]), ""]
+        fig = f"{model}_tails.png"
+        if ev.plot_tails(prim, os.path.join(out_dir, fig), title=f"{model}: {PRIMARY}"):
+            md += [f"![tails]({fig})", ""]
+        worst = {}
+        for r in prim:
+            if r["system"] in ev.RL_SYSTEMS:
+                w = ev.worst_regressions(outputs[r["system"]][PRIMARY], sft_rows)
+                if w:
+                    worst[r["system"]] = w
+                    write_jsonl(os.path.join(out_dir, f"{model}_worst_regressions_{ev.name(r['system'])}.jsonl"), w)
+        if worst:
+            md += ["Largest drops from SFT (all 20 per system in `<model>_worst_regressions_<system>.jsonl`):", ""]
+            for system, w in worst.items():
+                x = w[0]
+                md += [f"> **{ev.name(system)}**, COMET-22 {x['held_delta']:+.3f}"
+                       + (f", MetricX-QE {x['train_delta']:+.1f}" if x["train_delta"] is not None else "")
+                       + f" ({', '.join(x['introduced'])})  ", f"> SRC {x['src'][:180]}  ",
+                       f"> SFT {x['sft'][:180]}  ", f"> {ev.name(system).upper()} {x['system'][:180]}", ""]
+
     # B · over-optimization
     curves = {ev.name(run): ev.checkpoint_curve(outputs, run, DEV)
               for run in ("grpo", "grpo_guarded", "grpo_cometkiwi")}

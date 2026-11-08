@@ -143,6 +143,52 @@ def suspicious_wins(rl: list[dict], sft: list[dict], train_margin: float = 1.0,
     return out
 
 
+# --- beyond the average: tails and paired shifts --------------------------------------
+
+# COMET-22 bands on English-German FLORES (the SFT mean is ~0.82; 0.60 is about its 4th percentile)
+BANDS = [("poor", None, 0.60), ("weak", 0.60, 0.70), ("fine", 0.70, 0.85), ("very good", 0.85, None)]
+
+
+def tail_stats(rows: list[dict], metric: str = HELD_OUT, worst: float = 0.10) -> dict | None:
+    """Mean, mean of the worst `worst` share of segments, and the share of segments in each band (%)."""
+    s = scores(rows, metric)
+    if s is None:
+        return None
+    a = np.sort(np.asarray(s, float))
+    k = max(1, int(round(len(a) * worst)))
+    bands = {name: 100 * float(np.mean((a >= (lo if lo is not None else -np.inf)) &
+                                      (a < (hi if hi is not None else np.inf))))
+             for name, lo, hi in BANDS}
+    return {"n": len(a), "mean": float(a.mean()), "worst10_mean": float(a[:k].mean()), "bands": bands}
+
+
+def paired_shift(a_rows: list[dict], b_rows: list[dict], metric: str = HELD_OUT, margin: float = 0.05) -> dict | None:
+    """Share of segments clearly better / clearly worse than the other system (|delta| >= margin), in %."""
+    a, b = aligned(a_rows, b_rows)
+    sa, sb = scores(a, metric), scores(b, metric)
+    if not sa or not sb:
+        return None
+    d = np.asarray(sa) - np.asarray(sb)
+    return {"n": len(d), "better_pct": 100 * float((d >= margin).mean()), "worse_pct": 100 * float((d <= -margin).mean())}
+
+
+def worst_regressions(rl: list[dict], sft: list[dict], k: int = 20) -> list[dict]:
+    """The k segments where the held-out metric drops most from SFT to this system."""
+    a, b = aligned(rl, sft)
+    ha, hb, ta, tb = scores(a, HELD_OUT), scores(b, HELD_OUT), scores(a, TRAIN), scores(b, TRAIN)
+    if ha is None or hb is None:
+        return []
+    order = np.argsort(np.asarray(ha) - np.asarray(hb))[:k]
+    out = []
+    for i in order:
+        r, s = a[i], b[i]
+        fr, fs = exploit_flags(r), exploit_flags(s)
+        out.append({"id": r["id"], "src": r["src"], "ref": r.get("ref"), "system": r["hyp"], "sft": s["hyp"],
+                    "held_delta": ha[i] - hb[i], "train_delta": (ta[i] - tb[i]) if ta and tb else None,
+                    "introduced": [x for x in SIGNALS if fr[x] and not fs[x]] or ["other"]})
+    return out
+
+
 # --- curves --------------------------------------------------------------------------
 
 def checkpoint_curve(outputs: dict, run: str, dev: str = "flores_dev.en-de") -> list[dict]:
@@ -363,6 +409,58 @@ def win_rate(outcomes: list[float], n_boot: int = 2000, seed: int = 0) -> dict:
     return {"n": len(x), "wins": wins, "losses": losses, "ties": len(x) - wins - losses,
             "win_rate": float(x.mean()), "lo": float(np.quantile(boots, 0.025)),
             "hi": float(np.quantile(boots, 0.975)), "p": sign_test(wins, losses)}
+
+
+DIVERGING = {"better": "#2a78d6", "worse": "#e34948"}
+
+
+def plot_tails(rows: list[dict], path: str, title: str = "") -> bool:
+    """Left: share of poor segments per system. Right: segments clearly better / worse than SFT."""
+    rows = [r for r in rows if r.get("tails")]
+    if len(rows) < 2:
+        return False
+    fig, axes = _axes(2, width=4.6, height=0.42 * len(rows) + 1.4)
+    names = [name(r["system"]) for r in rows][::-1]
+    y = np.arange(len(rows))
+    poor = [r["tails"]["bands"]["poor"] for r in rows][::-1]
+    ax = axes[0]
+    ax.barh(y, poor, height=0.6, color=COLORS["grpo"])
+    for yi, v in zip(y, poor):
+        ax.text(v, yi, f" {v:.1f}", va="center", fontsize=7, color=INK)
+    ax.set_yticks(y, names, fontsize=8, color=INK)
+    ax.set_title("Poor translations: COMET-22 < 0.60 (% of segments)", fontsize=9, color=INK, loc="left")
+    ax.grid(axis="y", visible=False)
+    ax.grid(axis="x", color=GRID, linewidth=0.8)
+    ax = axes[1]
+    shift = [r for r in rows if r.get("shift")][::-1]
+    if shift:
+        ys = np.arange(len(shift))
+        better = [r["shift"]["better_pct"] for r in shift]
+        worse = [-r["shift"]["worse_pct"] for r in shift]
+        ax.barh(ys, better, height=0.6, color=DIVERGING["better"], label="clearly better than SFT")
+        ax.barh(ys, worse, height=0.6, color=DIVERGING["worse"], label="clearly worse than SFT")
+        for yi, b, w in zip(ys, better, worse):
+            ax.text(b, yi, f" {b:.1f}", va="center", ha="left", fontsize=7, color=INK)
+            ax.text(w, yi, f"{-w:.1f} ", va="center", ha="right", fontsize=7, color=INK)
+        lim = max(max(better), -min(worse)) * 1.35 + 1
+        ax.set_xlim(-lim, lim)
+        ax.axvline(0, color=MUTED, linewidth=1)
+        ax.set_yticks(ys, [name(r["system"]) for r in shift], fontsize=8, color=INK)
+        ax.set_title("Segments changed by ≥ 0.05 COMET-22 vs. SFT (%)", fontsize=9, color=INK, loc="left")
+        ax.legend(frameon=False, fontsize=7, labelcolor=INK, loc="upper center", bbox_to_anchor=(0.5, -0.08),
+                  ncol=2)
+        from matplotlib.ticker import FuncFormatter
+
+        ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{abs(v):g}"))
+        ax.grid(axis="y", visible=False)
+        ax.grid(axis="x", color=GRID, linewidth=0.8)
+    else:
+        ax.set_visible(False)
+    if title:
+        fig.suptitle(title, fontsize=10, color=INK, x=0.01, ha="left")
+    fig.tight_layout()
+    fig.savefig(path, facecolor=SURFACE)
+    return True
 
 
 def dump(path: str, obj) -> None:
