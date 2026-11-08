@@ -1,0 +1,21 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794155309.964688     847 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:02<00:02,  2.18s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.11s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.27s/it]
+(compat: PEFT rejects the installed torchao version; torchao is not used here, so it is ignored)
+de→en, adapter off                         in en: 100.0%  exact copy:   0.0%  chrF  63.9  {'en': 100}  same as stored base: 98%
+de→en, adapter ×0.25                       in en: 100.0%  exact copy:   0.0%  chrF  64.0  {'en': 100}
+de→en, adapter ×0.5                        in en: 100.0%  exact copy:   0.0%  chrF  62.8  {'en': 100}
+de→en, adapter ×0.75                       in en: 100.0%  exact copy:   0.0%  chrF  62.6  {'en': 100}
+de→en, adapter ×1 (SFT)                    in en: 100.0%  exact copy:   0.0%  chrF  61.6  {'en': 100}  same as stored sft: 98%
+de→en, SFT, instruction after the text     in en: 100.0%  exact copy:   0.0%  chrF  61.6  {'en': 100}
+fr→en, adapter off                         in en: 100.0%  exact copy:   0.0%  chrF  64.9  {'en': 100}
+fr→en, SFT                                 in en: 100.0%  exact copy:   0.0%  chrF  63.4  {'en': 100}
+de→zh, adapter off                         in zh: 100.0%  exact copy:   0.0%  chrF  30.5  {'zh': 100}
+de→zh, SFT                                 in zh:  95.0%  exact copy:   0.0%  chrF  28.0  {'zh': 95, 'en': 5}
+en→zh, SFT (control)                       in zh:   9.0%  exact copy:  32.0%  chrF   6.4  {'en': 91, 'zh': 9}
+fr→de, SFT (control)                       in de: 100.0%  exact copy:   0.0%  chrF  47.5  {'de': 100}
+-> results/p2/qwen3-1.7b/diagnostics/direction.md
