@@ -1,0 +1,13 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794199347.571901     799 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:02<00:02,  2.36s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.20s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.38s/it]
+(compat: PEFT rejects the installed torchao version; torchao is not used here, so it is ignored)
+grpo_guarded-step625 / flores_devtest.en-de: 1012 translations -> results/p2/qwen3-1.7b/outputs/grpo_guarded-step625/flores_devtest.en-de.jsonl
+grpo_guarded-step625 / wmt24.en-de: 998 translations -> results/p2/qwen3-1.7b/outputs/grpo_guarded-step625/wmt24.en-de.jsonl
+grpo_guarded-step625 / flores_devtest.de-en: 1012 translations -> results/p2/qwen3-1.7b/outputs/grpo_guarded-step625/flores_devtest.de-en.jsonl
+grpo_guarded-step625 / flores_devtest.en-zh: 1012 translations -> results/p2/qwen3-1.7b/outputs/grpo_guarded-step625/flores_devtest.en-zh.jsonl
+grpo_guarded-step625 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo_guarded-step625/flores_dev.en-de.jsonl

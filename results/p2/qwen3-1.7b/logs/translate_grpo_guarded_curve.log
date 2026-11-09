@@ -1,0 +1,57 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794200120.331336     826 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:02<00:02,  2.37s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.21s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.39s/it]
+(compat: PEFT rejects the installed torchao version; torchao is not used here, so it is ignored)
+grpo_guarded-step125 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo_guarded-step125/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.76s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.05it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.07s/it]
+grpo_guarded-step250 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo_guarded-step250/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.78s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.03it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.09s/it]
+grpo_guarded-step375 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo_guarded-step375/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.98s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.05s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.19s/it]
+grpo_guarded-step500 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo_guarded-step500/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.79s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.02it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.10s/it]
+grpo_guarded-step750 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo_guarded-step750/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.76s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.04it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.08s/it]
+grpo_guarded-step875 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo_guarded-step875/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.83s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.01it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.12s/it]
+grpo_guarded-step1000 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo_guarded-step1000/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.80s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.02it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.10s/it]
+grpo_guarded-step1125 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo_guarded-step1125/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.78s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.03it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.09s/it]
+grpo_guarded-step1250 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo_guarded-step1250/flores_dev.en-de.jsonl
