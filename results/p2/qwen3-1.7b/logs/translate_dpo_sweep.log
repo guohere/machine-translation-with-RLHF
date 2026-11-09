@@ -1,0 +1,27 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794228550.346989     607 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:02<00:02,  2.06s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.06s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.21s/it]
+(compat: PEFT rejects the installed torchao version; torchao is not used here, so it is ignored)
+dpo_sweep-ep1 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/dpo_sweep-ep1/flores_dev.en-de.jsonl
+dpo_sweep-ep1 / flores_devtest.en-de: 1012 translations -> results/p2/qwen3-1.7b/outputs/dpo_sweep-ep1/flores_devtest.en-de.jsonl
+dpo_sweep-ep1 / wmt24.en-de: 998 translations -> results/p2/qwen3-1.7b/outputs/dpo_sweep-ep1/wmt24.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.52s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.19it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.06it/s]
+dpo_sweep-ep2 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/dpo_sweep-ep2/flores_dev.en-de.jsonl
+dpo_sweep-ep2 / flores_devtest.en-de: 1012 translations -> results/p2/qwen3-1.7b/outputs/dpo_sweep-ep2/flores_devtest.en-de.jsonl
+dpo_sweep-ep2 / wmt24.en-de: 998 translations -> results/p2/qwen3-1.7b/outputs/dpo_sweep-ep2/wmt24.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.56s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.16it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.03it/s]
+dpo_sweep-ep3 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/dpo_sweep-ep3/flores_dev.en-de.jsonl
+dpo_sweep-ep3 / flores_devtest.en-de: 1012 translations -> results/p2/qwen3-1.7b/outputs/dpo_sweep-ep3/flores_devtest.en-de.jsonl
+dpo_sweep-ep3 / wmt24.en-de: 998 translations -> results/p2/qwen3-1.7b/outputs/dpo_sweep-ep3/wmt24.en-de.jsonl
