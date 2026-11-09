@@ -6,6 +6,9 @@ Means over each test set. Guard columns: % of outputs flagged. This is a sanity 
 |---|---|---|---|---|---|---|---|---|---|
 | base | flores_dev.en-de | 997 | 0.301 | 0.903 | 0.201 | 0.100 | 53.750 | -1.677 | 0.806 |
 | dpo | flores_dev.en-de | 997 | 0.100 | 1.404 | 0.301 | 0 | 56.368 | -1.231 | 0.818 |
+| dpo_sweep-ep1 | flores_dev.en-de | 997 | 0.100 | 1.705 | 96.891 | 0 | 37.028 | -2.257 | 0.637 |
+| dpo_sweep-ep2 | flores_dev.en-de | 997 | 0.602 | 2.307 | 48.245 | 0 | 47.156 | -1.714 | 0.734 |
+| dpo_sweep-ep3 | flores_dev.en-de | 997 | 0.401 | 2.407 | 40.421 | 0 | 48.206 | -1.681 | 0.747 |
 | grpo-step1000 | flores_dev.en-de | 997 | 0.100 | 1.404 | 0.100 | 0 | 54.996 | -1.010 | 0.840 |
 | grpo-step1125 | flores_dev.en-de | 997 | 0.100 | 1.705 | 0 | 0 | 53.593 | -0.941 | 0.837 |
 | grpo-step125 | flores_dev.en-de | 997 | 0.201 | 1.505 | 0 | 0 | 55.717 | -1.217 | 0.831 |
@@ -38,6 +41,9 @@ Means over each test set. Guard columns: % of outputs flagged. This is a sanity 
 | sft | flores_devtest.de-en | 1012 | 0 | 1.680 | 0.296 | 0 | 61.652 | -2.770 | 0.874 |
 | base | flores_devtest.en-de | 1012 | 0.099 | 0.692 | 0.198 | 0 | 53.278 | -1.610 | 0.805 |
 | dpo | flores_devtest.en-de | 1012 | 0 | 1.285 | 0.099 | 0 | 56.444 | -1.315 | 0.818 |
+| dpo_sweep-ep1 | flores_devtest.en-de | 1012 | 0.099 | 1.383 | 97.628 | 0 | 37.744 | -2.343 | 0.640 |
+| dpo_sweep-ep2 | flores_devtest.en-de | 1012 | 0.198 | 1.779 | 51.186 | 0 | 47.117 | -1.722 | 0.735 |
+| dpo_sweep-ep3 | flores_devtest.en-de | 1012 | 0.593 | 1.680 | 42.194 | 0 | 48.238 | -1.776 | 0.742 |
 | grpo-step625 | flores_devtest.en-de | 1012 | 0 | 1.087 | 0 | 0 | 54.786 | -1.092 | 0.839 |
 | grpo_guarded-step625 | flores_devtest.en-de | 1012 | 0.099 | 0.988 | 0 | 0 | 55.006 | -1.061 | 0.838 |
 | opus-mt | flores_devtest.en-de | 1012 | 0.099 | 1.383 | 0 | 0.099 | 63.663 | -1.285 | 0.847 |
@@ -52,6 +58,9 @@ Means over each test set. Guard columns: % of outputs flagged. This is a sanity 
 | sft | flores_devtest.en-zh | 1012 | 94.269 | 0.494 | 5.336 | 93.281 | 4.581 | -19.775 | 0.628 |
 | base | wmt24.en-de | 998 | 1.403 | 1.303 | 0.401 | 2.104 | 48.078 | -3.347 | 0.734 |
 | dpo | wmt24.en-de | 998 | 0.401 | 3.607 | 1.503 | 1.603 | 49.653 | -2.853 | 0.743 |
+| dpo_sweep-ep1 | wmt24.en-de | 998 | 1.503 | 3.507 | 76.152 | 1.202 | 33.119 | -3.117 | 0.604 |
+| dpo_sweep-ep2 | wmt24.en-de | 998 | 0.601 | 5.311 | 45.090 | 0.802 | 41.217 | -2.575 | 0.687 |
+| dpo_sweep-ep3 | wmt24.en-de | 998 | 0.200 | 5.912 | 43.086 | 0.501 | 41.512 | -2.592 | 0.690 |
 | grpo-step625 | wmt24.en-de | 998 | 0.601 | 3.607 | 0.802 | 1.603 | 48.240 | -2.546 | 0.769 |
 | grpo_guarded-step625 | wmt24.en-de | 998 | 0.501 | 3.106 | 0.701 | 1.804 | 48.616 | -2.485 | 0.772 |
 | opus-mt | wmt24.en-de | 998 | 0.401 | 1.403 | 1.102 | 1.904 | 53.718 | -3.502 | 0.733 |
