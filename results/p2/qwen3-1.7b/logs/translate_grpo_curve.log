@@ -1,0 +1,57 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794198109.753794     750 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:02<00:02,  2.41s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.23s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.40s/it]
+(compat: PEFT rejects the installed torchao version; torchao is not used here, so it is ignored)
+grpo-step125 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo-step125/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.76s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.04it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.08s/it]
+grpo-step250 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo-step250/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.74s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.02it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.09s/it]
+grpo-step375 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo-step375/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.74s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.05it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.07s/it]
+grpo-step500 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo-step500/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.69s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.07it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.05s/it]
+grpo-step750 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo-step750/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.78s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.03it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.09s/it]
+grpo-step875 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo-step875/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.64s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.12it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.01s/it]
+grpo-step1000 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo-step1000/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.74s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.05it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.07s/it]
+grpo-step1125 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo-step1125/flores_dev.en-de.jsonl
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]
+Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.73s/it]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.06it/s]
+Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.06s/it]
+grpo-step1250 / flores_dev.en-de: 997 translations -> results/p2/qwen3-1.7b/outputs/grpo-step1250/flores_dev.en-de.jsonl
