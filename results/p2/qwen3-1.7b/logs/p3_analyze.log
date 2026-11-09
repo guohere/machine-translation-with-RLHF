@@ -18,10 +18,13 @@ COMET-22 never guided training (held out); MetricX-QE is the training reward. Δ
 | sft+bo8 | 0.803 | -0.022 [-0.027, -0.017] * | -0.93 | +0.51 [+0.41, +0.62] * | +0.51 | 50.0 | 18.2 | 8 samples + 8 reward calls |
 | rsft | 0.830 | +0.005 [+0.002, +0.008] * | -1.31 | +0.12 [+0.04, +0.21] * | +0.00 | 54.7 | 24.9 | 1× |
 | dpo | 0.818 | -0.006 [-0.011, -0.001] * | -1.32 | +0.12 [+0.01, +0.23] * | +0.13 | 56.5 | 24.8 | 1× |
+| dpo 1/3 ep | 0.640 | -0.184 [-0.191, -0.178] * | -2.34 | -0.91 [-1.06, -0.78] * | +1.65 | 37.7 | 6.0 | 1× |
+| dpo 2/3 ep | 0.735 | -0.090 [-0.097, -0.083] * | -1.72 | -0.29 [-0.41, -0.15] * | +0.89 | 45.4 | 8.6 | 1× |
+| dpo 3/3 ep | 0.742 | -0.082 [-0.089, -0.076] * | -1.78 | -0.34 [-0.47, -0.21] * | +0.77 | 46.7 | 9.3 | 1× |
 | grpo | 0.839 | +0.014 [+0.010, +0.018] * | -1.09 | +0.34 [+0.24, +0.45] * | +0.01 | 54.8 | 23.7 | 1× |
 | grpo_guarded | 0.838 | +0.014 [+0.010, +0.018] * | -1.06 | +0.37 [+0.28, +0.48] * | +0.03 | 55.1 | 24.2 | 1× |
 
-wmt24.en-de (paragraph-level): base 0.734 (-0.013 [-0.019, -0.007] *); opus-mt 0.733 (-0.014 [-0.024, -0.004] *); sft 0.747; sft+bo8 0.714 (-0.033 [-0.039, -0.027] *); rsft 0.752 (+0.005 [+0.002, +0.008] *); dpo 0.743 (-0.005 [-0.010, +0.001]); grpo 0.769 (+0.022 [+0.017, +0.028] *); grpo_guarded 0.772 (+0.025 [+0.019, +0.030] *).
+wmt24.en-de (paragraph-level): base 0.734 (-0.013 [-0.019, -0.007] *); opus-mt 0.733 (-0.014 [-0.024, -0.004] *); sft 0.747; sft+bo8 0.714 (-0.033 [-0.039, -0.027] *); rsft 0.752 (+0.005 [+0.002, +0.008] *); dpo 0.743 (-0.005 [-0.010, +0.001]); dpo 1/3 ep 0.604 (-0.143 [-0.153, -0.133] *); dpo 2/3 ep 0.687 (-0.061 [-0.068, -0.053] *); dpo 3/3 ep 0.690 (-0.057 [-0.064, -0.049] *); grpo 0.769 (+0.022 [+0.017, +0.028] *); grpo_guarded 0.772 (+0.025 [+0.019, +0.030] *).
 
 ### A2 · Beyond the average: the tails on flores_devtest.en-de
 
@@ -35,6 +38,9 @@ Mean differences hide where a method helps or hurts. Bands of COMET-22 per segme
 | sft+bo8 | 5.7 | 10.3 | 42.3 | 41.7 | 0.580 | 12.4 | 27.8 |
 | rsft | 1.6 | 7.0 | 42.3 | 49.1 | 0.646 | 8.7 | 5.5 |
 | dpo | 3.9 | 7.6 | 42.3 | 46.2 | 0.608 | 15.1 | 20.5 |
+| dpo 1/3 ep | 33.4 | 39.6 | 26.8 | 0.2 | 0.482 | 1.7 | 91.7 |
+| dpo 2/3 ep | 11.4 | 24.2 | 51.1 | 13.3 | 0.538 | 6.6 | 63.4 |
+| dpo 3/3 ep | 11.0 | 22.3 | 51.0 | 15.7 | 0.545 | 7.3 | 59.7 |
 | grpo | 1.0 | 4.1 | 41.0 | 54.0 | 0.679 | 19.2 | 9.1 |
 | grpo_guarded | 1.0 | 5.5 | 39.1 | 54.3 | 0.670 | 18.2 | 10.5 |
 
@@ -57,6 +63,21 @@ Largest drops from SFT (all 20 per system in `<model>_worst_regressions_<system>
 > SFT Viele Gefangene wurden entführt und bis jetzt sind mindestens sechs bestätigt tot.  
 > DPO Einzahlungsschwestern wurden befreit und bisher sind wenigstens sechs bestätigt tot.
 
+> **dpo 1/3 ep**, COMET-22 -0.562, MetricX-QE -4.3 (long, repetition)  
+> SRC A curry is a dish based on herbs and spices, together with either meat or vegetables.  
+> SFT Ein Curry ist ein Gericht aus Gewürzen und Gewürzkräutern, mit Fleisch oder Gemüse.  
+> DPO 1/3 EP Ein Curry ist ein Gericht aus Gewürzen und Pflanzenextrakten, das entweder Fleisch oder Gemüse enthält. Es handelt sich dabei um eine Spezialität aus Gewürzen und Gewürzen sowie Ge
+
+> **dpo 2/3 ep**, COMET-22 -0.492, MetricX-QE -9.1 (long, repetition)  
+> SRC The ministry responded by calling Apple's postponement of the report "truly regrettable."  
+> SFT Der Ministeriums-Ausschuss reagierte mit der Behauptung, Apple's Verzögerung des Berichts sei "wirklich zu beklagen".  
+> DPO 2/3 EP Der Ministeriums-Ausschuss äußerte Apples Verzögerung der Ausgabe des Berichts als „tollerweise bedauernswert“ unhöflich anerkannt anerkannt betrachtete Erwägung gegenüber anerkann
+
+> **dpo 3/3 ep**, COMET-22 -0.594, MetricX-QE -8.4 (long, repetition)  
+> SRC The Arabs also brought Islam to the lands, and it took in a big way in the Comoros and Mayotte.  
+> SFT Die Araber brachten auch den Islam in die Länder, und er war in den Komoren und Mayotte sehr verbreitet.  
+> DPO 3/3 EP Die Araber brachten auch den Islam in diese Gebiete übernommen und dies besonders in den Inselstaaten der Komoren und Mayotte beträchtlich zum Erfolg geführt. Islam wurde dort dort
+
 > **grpo**, COMET-22 -0.381, MetricX-QE -6.3 (long)  
 > SRC Think of the skiing route as of a similar hiking route.  
 > SFT Den Skiliftweg kann man als ähnliche Wanderroute betrachten.  
@@ -66,6 +87,17 @@ Largest drops from SFT (all 20 per system in `<model>_worst_regressions_<system>
 > SRC After the results came in, Gingrich lauded Santorum, but had tough words for Romney, on whose behalf negative campaign advertisements were aired in Iowa against Gingrich.  
 > SFT Nach den Ergebnissen lobte Gingrich Santorum, aber hatte schwere Worte für Romney, der in Iowa gegen Gingrich negative Werbeeinlagen ausgestrahlt hatte.  
 > GRPO_GUARDED Nach den Ergebnissen lobte Gingrich Santorum, aber hatte schwere Worte gegen Romney, dessen Verteidiger negative Werbeeinlagenungen in Iowa gegen Gingrich ausgestrahlt wurden.
+
+### A3 · Does more DPO help?
+
+The same pairs, trained for 3 epochs with an adapter after each (one cosine schedule over all three, so epoch 1 is not the 1-epoch `dpo`). Choose the epoch on FLORES dev (first column); the rest is flores_devtest.en-de.
+
+| System | COMET-22 on flores_dev.en-de | COMET-22 Δ vs SFT | MetricX-QE Δ vs SFT | Poor % | Better than SFT % | Worse than SFT % |
+|---|---|---|---|---|---|---|
+| dpo | 0.818 | -0.006 [-0.011, -0.001] * | +0.12 [+0.01, +0.23] * | 3.9 | 15.1 | 20.5 |
+| dpo 1/3 ep | 0.637 | -0.184 [-0.191, -0.178] * | -0.91 [-1.06, -0.78] * | 33.4 | 1.7 | 91.7 |
+| dpo 2/3 ep | 0.734 | -0.090 [-0.097, -0.083] * | -0.29 [-0.41, -0.15] * | 11.4 | 6.6 | 63.4 |
+| dpo 3/3 ep | 0.747 | -0.082 [-0.089, -0.076] * | -0.34 [-0.47, -0.21] * | 11.0 | 7.3 | 59.7 |
 
 ### B · Over-optimization
 
@@ -91,6 +123,9 @@ Share of outputs with each signal (%). *short* / *long* = under 70% / over 140% 
 | sft+bo8 | 0.0 | 1.5 | 1.1 | 2.7 | 0.0 | 0.0 |
 | rsft | 0.0 | 1.1 | 1.2 | 0.8 | 0.0 | 0.1 |
 | dpo | 0.0 | 1.3 | 0.0 | 4.8 | 0.0 | 0.1 |
+| dpo 1/3 ep | 0.1 | 1.4 | 0.0 | 100.0 | 0.0 | 87.0 |
+| dpo 2/3 ep | 0.2 | 1.8 | 0.0 | 84.9 | 0.0 | 25.3 |
+| dpo 3/3 ep | 0.6 | 1.7 | 0.0 | 79.1 | 0.0 | 18.3 |
 | grpo | 0.0 | 1.1 | 0.3 | 1.6 | 0.0 | 0.0 |
 | grpo_guarded | 0.1 | 1.0 | 0.2 | 1.1 | 0.0 | 0.0 |
 
@@ -99,6 +134,9 @@ Share of outputs with each signal (%). *short* / *long* = under 70% / over 140% 
 - sft+bo8: 70 of 1012 segments — other 62, long 8
 - rsft: 6 of 1012 segments — other 6
 - dpo: 16 of 1012 segments — other 15, long 1
+- dpo 1/3 ep: 81 of 1012 segments — long 80, repetition 71
+- dpo 2/3 ep: 66 of 1012 segments — long 64, repetition 28, other 2, number_mismatch 1
+- dpo 3/3 ep: 64 of 1012 segments — long 60, repetition 23, other 3, number_mismatch 2
 - grpo: 17 of 1012 segments — other 16, long 1
 - grpo_guarded: 18 of 1012 segments — other 17, long 1
 
